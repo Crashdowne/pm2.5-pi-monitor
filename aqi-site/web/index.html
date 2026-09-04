@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <title>Air Quality</title>
+</head>
+<body>
+  <header class="topbar">
+    <h1 id="site-title">Air Quality</h1>
+    <div class="controls">
+      <label class="field"><span>Sensor</span><select id="sensor"></select></label>
+      <div class="seg" id="range" role="group" aria-label="Time range"></div>
+      <label class="field"><span>Sensitivity</span><select id="sensitivity"></select></label>
+      <button id="unit" class="btn" type="button" title="Toggle temperature unit">°C</button>
+      <a id="export" class="btn" download>Export</a>
+      <button id="alerts-btn" class="btn" type="button">Alerts</button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <main>
+    <section class="hero">
+      <div class="card gauge-card">
+        <div id="gauge" class="chart" role="img" aria-label="Current AQI gauge"></div>
+        <div id="gauge-meta" class="gauge-meta"></div>
+      </div>
+      <div class="card mask-card" id="mask-card"></div>
+    </section>
+
+    <section class="report" id="report" aria-label="Exposure summary"></section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>History</h2>
+        <div class="seg" id="metric" role="group" aria-label="Metric"></div>
+      </div>
+      <div id="timeseries" class="chart tall"></div>
+    </section>
+
+    <section class="grid-2">
+      <div class="card">
+        <div class="card-head"><h2>Yearly calendar</h2><div class="seg" id="year-nav"></div></div>
+        <div id="calendar" class="chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Weekly pattern</h2><span class="muted">avg AQI by hour</span></div>
+        <div id="heatmap" class="chart"></div>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="card">
+        <div class="card-head"><h2>Time in each band</h2></div>
+        <div id="distribution" class="chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Daily profile</h2><span class="muted" id="good-window"></span></div>
+        <div id="diurnal" class="chart"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Sensors</h2><span class="muted">tap to switch</span></div>
+      <div id="fleet" class="fleet"></div>
+    </section>
+
+    <footer id="disclaimer" class="muted"></footer>
+  </main>
+
+  <div id="alerts-panel" class="panel" hidden></div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

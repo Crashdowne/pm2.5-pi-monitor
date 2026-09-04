@@ -1,0 +1,40 @@
+# Example configuration for aqi-site (crashdowne/pi-aqi-monitor).
+# Copy to config.toml and mount it, or override any value with environment
+# variables (AQI_SITE_DB, AQI_SITE_PORT, ...). All access is read-only.
+
+[server]
+db_path = "/data/pm25.db"          # the warehouse written by server/ingest.py
+db_immutable = false               # true = read a static snapshot (implies :ro)
+state_db_path = "/state/aqi-site-state.db"
+host = "0.0.0.0"
+port = 8080
+# default_sensor = ""              # empty = most recently active device
+
+[display]
+site_title = "Air Quality"
+tz_offset_hours = 0                # local offset for hour/day pattern charts (e.g. -7)
+temp_unit = "c"                    # "c" or "f"
+
+[mask]
+# Conservative, asthma-tuned defaults. Choose a preset or override thresholds.
+sensitivity = "asthma"             # general | asthma | very_sensitive
+# carry_aqi = 51
+# recommended_aqi = 76
+# strong_aqi = 101
+# indoors_aqi = 201
+
+[alerts]
+enabled = false
+notify_from = "recommended"        # none | carry | recommended | strong | indoors
+min_interval_s = 3600              # re-notify at most this often per sensor
+quiet_start_hour = -1              # -1 disables quiet hours (else 0-23, local)
+quiet_end_hour = -1
+poll_interval_s = 300
+
+# ntfy push (https://ntfy.sh or self-hosted)
+ntfy_url = ""                      # e.g. "https://ntfy.sh"
+ntfy_topic = ""                    # e.g. "my-air-quality"
+# ntfy_token = ""                  # bearer token for protected topics
+
+# Generic webhook (receives a JSON POST)
+webhook_url = ""

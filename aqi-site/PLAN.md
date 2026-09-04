@@ -64,6 +64,8 @@ flowchart LR
   - `readings_raw(sensor_id TEXT, ts INTEGER, pm1_0, pm2_5, pm10, pm2_5_corr,
     n0_3, n0_5, n1_0, n2_5, n5_0, n10, rh, temp, PRIMARY KEY(sensor_id, ts))`
   - `devices(sensor_id PK, sample_period_s, last_ingest_ts, last_reading_ts)`
+  - `rh` (%) and `temp` (°C) originate from the **GY-SHT31** sensor on the Pi and
+    may be NULL when it is disabled or a read fails; the same RH drives `pm2_5_corr`.
   - Analytics **bucket from raw** (`GROUP BY ts/bucket`), preferring
     `COALESCE(pm2_5_corr, pm2_5)` — same pattern as the existing endpoints.
 - **Backend:** Python 3.12, Flask + waitress. Reuses `pm25.aqi`
@@ -73,6 +75,26 @@ flowchart LR
   existing palette (`--bg #0b1220`). Installable PWA, mobile-first.
 - **Sidecar state:** alert config + last-fired timestamps live in the sidecar's
   own tiny SQLite (`/data/aqi-site-state.db`) — never the warehouse.
+
+### Environmental data — GY-SHT31 (temperature / humidity)
+
+Temp/RH are produced upstream by the **GY-SHT31** breakout (Sensirion **SHT31-D**,
+I2C, address `0x44`/`0x45`) on the Pi and flow through the warehouse into this
+read-only sidecar. In the core app:
+
+- **Driver:** [`src/pm25/sensor_sht31.py`](../src/pm25/sensor_sht31.py) — high-repeatability
+  single-shot measurement, CRC-checked; `read()` → `(rh %, temp °C)`
+  (`temp = -45 + 175·raw/65535`, `rh = 100·raw/65535`, clamped 0–100).
+- **Wiring:** [`src/pm25/reader.py`](../src/pm25/reader.py) stamps `rh`/`temp` on each row
+  (rounded to 0.1) and computes `pm2_5_corr = aqi.correct_pm25(pm2_5_std, rh)`
+  (EPA/Barkjohn). It is fault-tolerant: a sensor failure logs a warning and PM
+  logging continues, so `rh`/`temp`/`pm2_5_corr` may be absent on some rows.
+- **Config:** `[sensor.sht31]` (`enabled`, `address`) in
+  [`src/pm25/config.py`](../src/pm25/config.py).
+
+The sidecar therefore treats temp/RH as **optional**: it charts them when present
+(°C/°F toggle, optional dew-point), and its AQI already prefers the SHT31-driven
+`pm2_5_corr`, falling back to raw `pm2_5` when RH is missing.
 
 ---
 
@@ -84,6 +106,8 @@ flowchart LR
 - **Time-series explorer** — PM2.5 / PM10 / temp / RH over 6h / 24h / 7d / 30d /
   90d / 1y / custom, with zoom & pan (`dataZoom`), AQI category bands shaded behind
   the line, and a raw-vs-NowCast toggle.
+- **Temperature & humidity (GY-SHT31)** — temp (°C/°F toggle) and RH% trends from
+  the SHT31-D, with optional dew-point; shown only when the sensor reported data.
 - **Calendar heatmap** — a full year of daily AQI at a glance; click a day to drill in.
 - **Hour × weekday heatmap** — reveals rush-hour / cooking / burn-season patterns.
 - **AQI distribution donut** — "% of time in each band" for the window.
@@ -226,4 +250,7 @@ Fallback: vendor a small `aqi.py` copy if a fully decoupled build context is pre
   available for static snapshots. Covered in S1 + README.
 - **No hardware here:** validate on macOS against a seeded temp SQLite DB
   (matching the warehouse schema), same as the core project's test approach.
+- **Optional GY-SHT31 data:** `rh`/`temp` (and the derived `pm2_5_corr`) may be
+  NULL when the sensor is disabled or a read fails. Temp/RH charts, dew-point, and
+  humidity-corrected PM2.5 degrade gracefully to raw `pm2_5` when RH is absent.
 - **Not medical advice:** disclaimer shown on the mask card and in the README.
