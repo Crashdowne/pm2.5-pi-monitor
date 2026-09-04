@@ -92,6 +92,39 @@ class AnalyticsTests(unittest.TestCase):
         self.assertEqual(ids, {"backyard", "rooftop", "smoky"})
         for row in overview:
             self.assertLessEqual(row["coverage_24h"], 100)
+            self.assertIn("online", row)
+
+    def test_current_online(self):
+        data = analytics.current(self.conn, "backyard", self.mask_cfg)
+        self.assertTrue(data["online"])
+        self.assertFalse(data["stale"])
+        self.assertEqual(data["sample_period_s"], 900)
+
+    def test_diurnal_aqi_minmax(self):
+        rows = [r for r in analytics.diurnal(self.conn, "backyard", "7d") if r["avg"] is not None]
+        self.assertTrue(rows)
+        self.assertIn("aqi_min", rows[0])
+        self.assertIn("aqi_max", rows[0])
+        self.assertLessEqual(rows[0]["aqi_min"], rows[0]["aqi_max"])
+
+    def test_summary_by_period(self):
+        s = analytics.summary(self.conn, "backyard")
+        self.assertEqual([p["period"] for p in s["by_period"]], ["24h", "7d", "30d"])
+        for p in s["by_period"]:
+            self.assertIn("peak_aqi", p)
+            self.assertIn("unhealthy_hours", p)
+            self.assertIn("cigarettes", p)
+
+    def test_status(self):
+        st = analytics.status(self.conn, "backyard")
+        self.assertTrue(st["online"])
+        self.assertEqual(st["coverage_24h"]["pct"], 100)
+        self.assertTrue(st["sht31"]["ok"])  # backyard reports temp + rh
+        self.assertIn("gaps_7d", st)
+
+    def test_status_sht31_absent(self):
+        st = analytics.status(self.conn, "rooftop")
+        self.assertFalse(st["sht31"]["ok"])  # rooftop has no temp/rh (SHT31 disabled)
 
 
 if __name__ == "__main__":

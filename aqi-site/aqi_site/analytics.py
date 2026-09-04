@@ -37,6 +37,11 @@ BANDS: list[tuple[int, str, str]] = [
 # Berkeley Earth rule of thumb: ~22 ug/m3 of PM2.5 for a day ≈ one cigarette.
 CIGARETTE_UGM3_DAY = 22.0
 
+# A sensor counts as stale/offline once its newest reading is older than this
+# (the larger of a floor and a few sample periods).
+STALE_FLOOR_S = 900
+STALE_PERIODS = 3
+
 
 def _aqi_of(pm2_5: float | None, pm10: float | None) -> tuple[int, str]:
     """Overall AQI and dominant pollutant for a bucket's mean concentrations."""
@@ -118,10 +123,20 @@ def current(conn: sqlite3.Connection, sensor_id: str, mask_cfg: MaskConfig, offs
     category = aqi.category(overall)
     trend = _trend(conn, sensor_id, latest_ts)
     reco = mask.recommend(overall, mask_cfg.thresholds, dominant=dominant, trend=trend)
+    device = db.device_row(conn, sensor_id)
+    sample_period = device["sample_period_s"] if device else 120
+    last_ingest_ts = device["last_ingest_ts"] if device else 0
+    age = max(0, now - latest_ts)
+    stale = age > max(STALE_FLOOR_S, STALE_PERIODS * sample_period)
     return {
         "sensor_id": sensor_id,
         "ts": latest_ts,
-        "age_s": max(0, now - latest_ts),
+        "age_s": age,
+        "online": not stale,
+        "stale": stale,
+        "last_ingest_ts": last_ingest_ts or None,
+        "last_ingest_age_s": (max(0, now - last_ingest_ts) if last_ingest_ts else None),
+        "sample_period_s": sample_period,
         "pm2_5": corr_latest,
         "pm2_5_raw": latest["pm2_5"],
         "pm10": latest["pm10"],
@@ -235,7 +250,8 @@ def diurnal(conn: sqlite3.Connection, sensor_id: str, range_key: str, offset: in
     for hour in range(24):
         r = by_hour.get(hour)
         if r is None or r["avg_pm"] is None:
-            out.append({"hour": hour, "avg": None, "min": None, "max": None, "aqi": None})
+            out.append({"hour": hour, "avg": None, "min": None, "max": None,
+                        "aqi": None, "aqi_min": None, "aqi_max": None})
             continue
         out.append(
             {
@@ -244,6 +260,8 @@ def diurnal(conn: sqlite3.Connection, sensor_id: str, range_key: str, offset: in
                 "min": _round(r["min_pm"]),
                 "max": _round(r["max_pm"]),
                 "aqi": aqi.aqi("pm2_5", r["avg_pm"]) or 0,
+                "aqi_min": aqi.aqi("pm2_5", r["min_pm"]) or 0,
+                "aqi_max": aqi.aqi("pm2_5", r["max_pm"]) or 0,
             }
         )
     return out
@@ -275,7 +293,37 @@ def summary(conn: sqlite3.Connection, sensor_id: str) -> dict:
     out["exceedance_hours_30d"] = sum(
         1 for r in exceed_rows if _aqi_of(r["pm2_5"], r["pm10"])[0] > 100
     )
+    out["by_period"] = [
+        _period_stats(conn, sensor_id, period, span)
+        for period, span in (("24h", 86400), ("7d", 7 * 86400), ("30d", 30 * 86400))
+    ]
     return out
+
+
+def _period_stats(conn: sqlite3.Connection, sensor_id: str, period: str, span: int) -> dict:
+    now = int(time.time())
+    mean = _mean_pm(conn, sensor_id, now - span, now)
+    hourly = conn.execute(
+        f"SELECT avg({db.PM25}) AS pm2_5, avg(pm10) AS pm10 "
+        "FROM readings_raw WHERE sensor_id=? AND ts>=? GROUP BY ts/3600",
+        (sensor_id, now - span),
+    ).fetchall()
+    peak = 0
+    unhealthy = 0
+    for r in hourly:
+        value, _dominant = _aqi_of(r["pm2_5"], r["pm10"])
+        peak = max(peak, value)
+        if value > 100:
+            unhealthy += 1
+    days = span / 86400
+    return {
+        "period": period,
+        "avg_aqi": aqi.aqi("pm2_5", mean) if mean is not None else None,
+        "peak_aqi": peak if hourly else None,
+        "unhealthy_hours": unhealthy,
+        "cigarettes": round(mean * days / CIGARETTE_UGM3_DAY, 1) if mean is not None else None,
+        "pm25": _round(mean),
+    }
 
 
 def export_rows(conn: sqlite3.Connection, sensor_id: str, range_key: str) -> list[dict]:
@@ -308,6 +356,12 @@ def sensors_overview(conn: sqlite3.Connection, mask_cfg: MaskConfig, offset: int
                 "color": snap["color"],
                 "mask_level": snap["mask"]["level"],
                 "coverage_24h": min(100, round(count_24h * 100 / expected)),
+                "online": snap["online"],
+                "stale": snap["stale"],
+                "last_ingest_ts": snap["last_ingest_ts"],
+                "last_ingest_age_s": snap["last_ingest_age_s"],
+                "sample_period_s": snap["sample_period_s"],
+                "sht31_ok": (snap["temp"] is not None and snap["rh"] is not None),
             }
         )
     return out
@@ -315,3 +369,66 @@ def sensors_overview(conn: sqlite3.Connection, mask_cfg: MaskConfig, offset: int
 
 def _round(value: float | None, ndigits: int = 1) -> float | None:
     return round(value, ndigits) if value is not None else None
+
+
+def status(conn: sqlite3.Connection, sensor_id: str) -> dict | None:
+    """Device-health view: online/stale, coverage, GY-SHT31 health, and recent gaps."""
+    latest = db.latest_reading(conn, sensor_id)
+    device = db.device_row(conn, sensor_id)
+    if latest is None and device is None:
+        return None
+    now = int(time.time())
+    sample_period = device["sample_period_s"] if device else 120
+    last_reading_ts = latest["ts"] if latest is not None else 0
+    last_ingest_ts = device["last_ingest_ts"] if device else 0
+    age = max(0, now - last_reading_ts) if last_reading_ts else None
+    stale = age is None or age > max(STALE_FLOOR_S, STALE_PERIODS * sample_period)
+
+    def _coverage(span: int) -> dict:
+        count = db.count_since(conn, sensor_id, now - span)
+        expected = max(1, round(span / sample_period))
+        return {"expected": expected, "actual": count, "pct": min(100, round(count * 100 / expected))}
+
+    env = conn.execute(
+        "SELECT count(*) AS total, count(temp) AS temp_n, count(rh) AS rh_n "
+        "FROM readings_raw WHERE sensor_id=? AND ts>=?",
+        (sensor_id, now - 86400),
+    ).fetchone()
+    env_total = env["total"] or 0
+    sht31_ok = latest is not None and latest["temp"] is not None and latest["rh"] is not None
+
+    gap_threshold = max(2 * sample_period, 600)
+    ts_rows = conn.execute(
+        "SELECT ts FROM readings_raw WHERE sensor_id=? AND ts>=? ORDER BY ts",
+        (sensor_id, now - 7 * 86400),
+    ).fetchall()
+    gaps: list[dict] = []
+    prev = None
+    for row in ts_rows:
+        if prev is not None and row["ts"] - prev > gap_threshold:
+            gaps.append({"start": prev, "end": row["ts"], "duration_s": row["ts"] - prev, "ongoing": False})
+        prev = row["ts"]
+    if prev is not None and now - prev > gap_threshold:
+        gaps.append({"start": prev, "end": now, "duration_s": now - prev, "ongoing": True})
+    gaps.sort(key=lambda g: g["duration_s"], reverse=True)
+
+    return {
+        "sensor_id": sensor_id,
+        "online": not stale,
+        "stale": stale,
+        "last_reading_ts": last_reading_ts or None,
+        "last_reading_age_s": age,
+        "last_ingest_ts": last_ingest_ts or None,
+        "last_ingest_age_s": (max(0, now - last_ingest_ts) if last_ingest_ts else None),
+        "sample_period_s": sample_period,
+        "coverage_24h": _coverage(86400),
+        "coverage_7d": _coverage(7 * 86400),
+        "sht31": {
+            "ok": sht31_ok,
+            "temp_pct_24h": round(env["temp_n"] * 100 / env_total) if env_total else 0,
+            "rh_pct_24h": round(env["rh_n"] * 100 / env_total) if env_total else 0,
+            "temp": latest["temp"] if latest is not None else None,
+            "rh": latest["rh"] if latest is not None else None,
+        },
+        "gaps_7d": {"count": len(gaps), "items": gaps[:20]},
+    }

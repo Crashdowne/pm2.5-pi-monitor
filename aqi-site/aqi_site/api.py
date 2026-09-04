@@ -193,6 +193,16 @@ def create_app(config: Config) -> Flask:
             data = analytics.summary(conn, sid)
         return jsonify(data)
 
+    @app.get("/api/sensors/<sensor_id>/status")
+    def sensor_status(sensor_id: str):
+        valid_sensor(sensor_id)
+        with _conn_or_503(open_ro) as conn:
+            sid = pick_sensor(conn, sensor_id)
+            data = analytics.status(conn, sid)
+        if data is None:
+            abort(404, "no device")
+        return jsonify(data)
+
     @app.get("/api/sensors/<sensor_id>/mask")
     def sensor_mask(sensor_id: str):
         valid_sensor(sensor_id)

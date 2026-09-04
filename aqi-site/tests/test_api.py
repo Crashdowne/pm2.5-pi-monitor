@@ -77,6 +77,18 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIsInstance(resp.get_json(), list)
 
+    def test_status_endpoint(self):
+        body = self.client.get("/api/sensors/backyard/status").get_json()
+        self.assertIn("online", body)
+        self.assertIn("coverage_24h", body)
+        self.assertIn("sht31", body)
+        self.assertIn("gaps_7d", body)
+
+    def test_current_has_online(self):
+        body = self.client.get("/api/sensors/backyard/current").get_json()
+        self.assertIn("online", body)
+        self.assertIn("sample_period_s", body)
+
     def test_alerts_get_post(self):
         self.assertEqual(self.client.get("/api/alerts").get_json()["enabled"], False)
         resp = self.client.post("/api/alerts", json={"enabled": True, "notify_from": "strong"})
