@@ -18,7 +18,7 @@ class SensorConfig:
     device: str = "/dev/ttyAMA0"
     baud: int = 9600
     mode: str = "duty_cycle"  # "duty_cycle" | "continuous"
-    period_s: int = 120
+    period_s: int = 180
     warmup_s: int = 30
     sample_s: int = 8
     reset_after_failures: int = 3
@@ -52,7 +52,7 @@ class SyncConfig:
     trigger_db_size_mb: int = 200
     trigger_disk_free_mb: int = 200
     retry_total: int = 3
-    gzip_enabled: bool = False
+    gzip_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -137,7 +137,7 @@ def load_config(path: str | Path) -> Config:
         device=s.get("device", "/dev/ttyAMA0"),
         baud=int(s.get("baud", 9600)),
         mode=s.get("mode", "duty_cycle"),
-        period_s=int(s.get("period_s", 120)),
+        period_s=int(s.get("period_s", 180)),
         warmup_s=int(s.get("warmup_s", 30)),
         sample_s=int(s.get("sample_s", 8)),
         reset_after_failures=int(s.get("reset_after_failures", 3)),
@@ -171,7 +171,7 @@ def load_config(path: str | Path) -> Config:
         trigger_db_size_mb=int(y.get("trigger_db_size_mb", 200)),
         trigger_disk_free_mb=int(y.get("trigger_disk_free_mb", 200)),
         retry_total=int(y.get("retry_total", 3)),
-        gzip_enabled=bool(y.get("gzip_enabled", False)),
+        gzip_enabled=bool(y.get("gzip_enabled", True)),
     )
 
     a = data.get("alerts", {})

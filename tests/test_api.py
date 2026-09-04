@@ -21,7 +21,11 @@ class ApiTests(unittest.TestCase):
         self.now = int(time.time())
         conn = db.connect(self.db_path)
         db.init_db(conn)
-        db.insert_raw(conn, self.now, {"pm2_5": 10, "pm2_5_corr": 8, "pm10": 12, "rh": 48})
+        db.insert_raw(
+            conn,
+            self.now,
+            {"pm2_5": 10, "pm2_5_corr": 8, "pm10": 12, "rh": 48, "temp": 21},
+        )
         db.update_rollups(conn, self.now)
         db.record_reader_cycle(
             conn,
@@ -44,6 +48,7 @@ class ApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
+        self.assertEqual(response.headers["Cache-Control"], "no-cache")
         self.assertEqual(payload["health"]["sample_period_s"], 120)
         self.assertEqual(payload["health"]["sensors"]["pm"], "ok")
         self.assertEqual(payload["health"]["sensors"]["humidity"], "ok")
@@ -57,6 +62,29 @@ class ApiTests(unittest.TestCase):
 
         self.assertEqual(payload["hourly"][0]["samples"], 1)
         self.assertGreater(payload["hourly"][0]["coverage"], 0)
+        self.assertEqual(payload["hourly"][0]["rh"], 48)
+        self.assertEqual(payload["hourly"][0]["temp"], 21)
+        self.assertEqual(payload["daily"][0]["rh"], 48)
+        self.assertEqual(payload["daily"][0]["temp"], 21)
+        self.assertEqual(payload["weekly"][0]["rh"], 48)
+        self.assertEqual(payload["weekly"][0]["temp"], 21)
+
+    def test_cadence_change_invalidates_current_etag(self) -> None:
+        old_response = self.client.get("/api/current")
+        updated_cfg = Config(
+            sensor=SensorConfig(period_s=180, sht31=SHT31Config(enabled=True)),
+            storage=self.cfg.storage,
+            web=self.cfg.web,
+            sync=self.cfg.sync,
+        )
+        updated_client = create_app(updated_cfg).test_client()
+
+        response = updated_client.get(
+            "/api/current", headers={"If-None-Match": old_response.headers["ETag"]}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["health"]["sample_period_s"], 180)
 
 
 if __name__ == "__main__":

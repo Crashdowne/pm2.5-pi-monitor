@@ -22,12 +22,14 @@ CREATE TABLE IF NOT EXISTS readings_raw (
 
 CREATE TABLE IF NOT EXISTS readings_hourly (
     ts_hour INTEGER PRIMARY KEY,
-    pm2_5 REAL, pm10 REAL, pm2_5_corr REAL, samples INTEGER
+    pm2_5 REAL, pm10 REAL, pm2_5_corr REAL,
+    rh REAL, temp REAL, samples INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS readings_daily (
     ts_day INTEGER PRIMARY KEY,
-    pm2_5 REAL, pm10 REAL, pm2_5_corr REAL, samples INTEGER
+    pm2_5 REAL, pm10 REAL, pm2_5_corr REAL,
+    rh REAL, temp REAL, samples INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS sync_state (
@@ -123,25 +125,29 @@ def update_rollups(conn: sqlite3.Connection, ts: int) -> None:
     day = ts - ts % 86400
 
     h = conn.execute(
-        "SELECT avg(pm2_5), avg(pm10), avg(pm2_5_corr), count(*) FROM readings_raw WHERE ts >= ? AND ts < ?",
+        "SELECT avg(pm2_5), avg(pm10), avg(pm2_5_corr), avg(rh), avg(temp), count(*) "
+        "FROM readings_raw WHERE ts >= ? AND ts < ?",
         (hour, hour + 3600),
     ).fetchone()
     conn.execute(
-        "INSERT INTO readings_hourly (ts_hour, pm2_5, pm10, pm2_5_corr, samples) VALUES (?, ?, ?, ?, ?) "
+        "INSERT INTO readings_hourly (ts_hour, pm2_5, pm10, pm2_5_corr, rh, temp, samples) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(ts_hour) DO UPDATE SET pm2_5=excluded.pm2_5, pm10=excluded.pm10, "
-        "pm2_5_corr=excluded.pm2_5_corr, samples=excluded.samples",
-        (hour, h[0], h[1], h[2], h[3]),
+        "pm2_5_corr=excluded.pm2_5_corr, rh=excluded.rh, temp=excluded.temp, samples=excluded.samples",
+        (hour, h[0], h[1], h[2], h[3], h[4], h[5]),
     )
 
     d = conn.execute(
-        "SELECT avg(pm2_5), avg(pm10), avg(pm2_5_corr), count(*) FROM readings_raw WHERE ts >= ? AND ts < ?",
+        "SELECT avg(pm2_5), avg(pm10), avg(pm2_5_corr), avg(rh), avg(temp), count(*) "
+        "FROM readings_raw WHERE ts >= ? AND ts < ?",
         (day, day + 86400),
     ).fetchone()
     conn.execute(
-        "INSERT INTO readings_daily (ts_day, pm2_5, pm10, pm2_5_corr, samples) VALUES (?, ?, ?, ?, ?) "
+        "INSERT INTO readings_daily (ts_day, pm2_5, pm10, pm2_5_corr, rh, temp, samples) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(ts_day) DO UPDATE SET pm2_5=excluded.pm2_5, pm10=excluded.pm10, "
-        "pm2_5_corr=excluded.pm2_5_corr, samples=excluded.samples",
-        (day, d[0], d[1], d[2], d[3]),
+        "pm2_5_corr=excluded.pm2_5_corr, rh=excluded.rh, temp=excluded.temp, samples=excluded.samples",
+        (day, d[0], d[1], d[2], d[3], d[4], d[5]),
     )
 
 

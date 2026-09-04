@@ -2,8 +2,8 @@
 
 Outdoor particulate monitor: a **Raspberry Pi Zero 2 W + PMS5003** on **DietPi** that reads
 the sensor, stores readings in SQLite, serves an **installable PWA dashboard** (current +
-hourly + daily + weekly averages with US-EPA AQI), and offloads history to a central server
-over **Tailscale** before pruning locally.
+hourly + daily + weekly averages with US-EPA AQI, plus SHT31 temperature/humidity history),
+and offloads history to a central server over **Tailscale** before pruning locally.
 
 See [PLAN.md](PLAN.md) for the full design, research, and roadmap.
 
@@ -30,7 +30,8 @@ Minimum to read = VCC, GND, TXD->RXD. SET/RESET enable duty-cycling. Logic is 3.
 level shifter needed). An **SHT31-D** humidity/temp sensor (I2C, address `0x44`; SDA=GPIO2
 pin 3, SCL=GPIO3 pin 5) is enabled in the sample config; `install.sh` turns on I2C. Set
 `sht31.enabled = false` if you haven't wired it. When RH is available, PM2.5 is
-humidity-corrected (EPA/Barkjohn) and the dashboard + AQI show the corrected value.
+humidity-corrected (EPA/Barkjohn); the local and fleet dashboards show corrected PM plus
+hourly temperature and relative-humidity history.
 
 ## Install on the Pi (DietPi)
 
@@ -42,7 +43,8 @@ sudo tailscale up           # join your tailnet
 ```
 
 `install.sh` writes `/etc/pm25/config.toml` from the example on first run. The dashboard is
-then at `http://<pi-lan-or-tailscale-ip>:8080`.
+then at `http://<pi-lan-or-tailscale-ip>:8080`. Installation creates the complete SQLite
+schema, including SHT31 temperature and humidity rollups, before starting the services.
 
 ### Services
 
@@ -91,6 +93,16 @@ Set `[alerts] enabled = true` and `webhook_url` in `/etc/pm25/config.toml`. The 
 receives small JSON transition events for sustained high AQI, recovery, stale readings,
 sync failures, and low disk space. Optional webhook authentication uses the environment
 variable named by `alerts.token_env`; put that value in `/etc/pm25/sync.env`.
+
+After changing `alerts.enabled`, apply the timer state with:
+
+```bash
+sudo systemctl enable --now pm25-alert.timer   # enabled = true
+sudo systemctl disable --now pm25-alert.timer  # enabled = false
+```
+
+The install and update scripts apply this automatically. Keeping the timer disabled with
+alerts avoids launching an otherwise idle Python process every two minutes.
 
 AQI alerts require consecutive checks and use separate trigger/recovery thresholds plus a
 cooldown, preventing repeated notifications when values hover near a boundary.

@@ -47,7 +47,8 @@
   canvas { width: 100%; height: 150px; display: block; }
   .legend { display: flex; gap: 14px; font-size: 11px; color: var(--muted); }
   .legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
-  .legend .pm25 { background: var(--accent); } .legend .pm10 { background: #38bdf8; opacity: .8; }
+  .legend .pm25 i { background: var(--accent); } .legend .pm10 i { background: #38bdf8; opacity: .8; }
+  .legend .temp i { background: #fb7185; } .legend .rh i { background: #22d3ee; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   @media (max-width: 480px) {
@@ -89,6 +90,13 @@
       <span class="legend"><span class="pm25"><i></i>PM2.5</span><span class="pm10"><i></i>PM10</span></span></div>
     <canvas id="hourly" role="img" aria-describedby="hourly-summary"></canvas>
     <span class="sr-only" id="hourly-summary">No hourly data yet.</span>
+  </section>
+
+  <section class="card">
+    <div class="chart-title"><span>Temperature &amp; humidity &middot; hourly</span>
+      <span class="legend"><span class="temp"><i></i>Temperature</span><span class="rh"><i></i>Humidity</span></span></div>
+    <canvas id="environment" role="img" aria-describedby="environment-summary"></canvas>
+    <span class="sr-only" id="environment-summary">No SHT31 history yet.</span>
   </section>
 
   <section class="card">

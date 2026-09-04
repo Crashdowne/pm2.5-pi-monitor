@@ -31,6 +31,12 @@ def create_app(cfg: Config) -> Flask:
     def get_conn():
         return db.connect(cfg.storage.db_path)
 
+    @app.after_request
+    def revalidate_api(response):
+        if request.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
     def health_payload(conn, last_ts: int | None) -> dict:
         now = int(time.time())
         period = max(1, cfg.sensor.period_s if cfg.sensor.mode == "duty_cycle" else 60)
@@ -150,7 +156,10 @@ def create_app(cfg: Config) -> Flask:
             }
         )
         sync = health["sync"]
-        response.set_etag(f'{row["ts"]}-{health["reader"]["consecutive_failures"]}-{sync["last_attempt_ts"]}')
+        response.set_etag(
+            f'{row["ts"]}-{health["sample_period_s"]}-'
+            f'{health["reader"]["consecutive_failures"]}-{sync["last_attempt_ts"]}'
+        )
         return response.make_conditional(request)
 
     @app.get("/api/history")
@@ -193,15 +202,18 @@ def create_app(cfg: Config) -> Flask:
         expected_day = max(1, round(86400 / period))
         conn = get_conn()
         hourly = conn.execute(
-            "SELECT ts_hour AS t, COALESCE(pm2_5_corr, pm2_5) AS pm2_5, pm10, samples FROM readings_hourly WHERE ts_hour >= ? ORDER BY ts_hour",
+            "SELECT ts_hour AS t, COALESCE(pm2_5_corr, pm2_5) AS pm2_5, pm10, rh, temp, samples "
+            "FROM readings_hourly WHERE ts_hour >= ? ORDER BY ts_hour",
             (now - 24 * 3600,),
         ).fetchall()
         daily = conn.execute(
-            "SELECT ts_day AS t, COALESCE(pm2_5_corr, pm2_5) AS pm2_5, pm10, samples FROM readings_daily WHERE ts_day >= ? ORDER BY ts_day",
+            "SELECT ts_day AS t, COALESCE(pm2_5_corr, pm2_5) AS pm2_5, pm10, rh, temp, samples "
+            "FROM readings_daily WHERE ts_day >= ? ORDER BY ts_day",
             (now - 30 * 86400,),
         ).fetchall()
         for_weeks = conn.execute(
-            "SELECT ts_day AS t, COALESCE(pm2_5_corr, pm2_5) AS pm2_5, pm10, samples FROM readings_daily WHERE ts_day >= ? ORDER BY ts_day",
+            "SELECT ts_day AS t, COALESCE(pm2_5_corr, pm2_5) AS pm2_5, pm10, rh, temp, samples "
+            "FROM readings_daily WHERE ts_day >= ? ORDER BY ts_day",
             (now - 12 * 604800,),
         ).fetchall()
         conn.close()
@@ -209,15 +221,21 @@ def create_app(cfg: Config) -> Flask:
         wk: dict[int, dict[str, list[float] | int]] = {}
         for r in for_weeks:
             k = r["t"] - r["t"] % 604800
-            b = wk.setdefault(k, {"pm2_5": [], "pm10": [], "samples": 0})
+            b = wk.setdefault(k, {"pm2_5": [], "pm10": [], "rh": [], "temp": [], "samples": 0})
             b["pm2_5"].append(r["pm2_5"])
             b["pm10"].append(r["pm10"])
+            if r["rh"] is not None:
+                b["rh"].append(r["rh"])
+            if r["temp"] is not None:
+                b["temp"].append(r["temp"])
             b["samples"] += r["samples"]
         weekly = [
             {
                 "t": k,
                 "pm2_5": sum(v["pm2_5"]) / len(v["pm2_5"]),
                 "pm10": sum(v["pm10"]) / len(v["pm10"]),
+                "rh": sum(v["rh"]) / len(v["rh"]) if v["rh"] else None,
+                "temp": sum(v["temp"]) / len(v["temp"]) if v["temp"] else None,
                 "samples": v["samples"],
                 "coverage": min(1, v["samples"] / (expected_day * 7)),
             }
@@ -225,8 +243,8 @@ def create_app(cfg: Config) -> Flask:
         ]
         return jsonify(
             {
-                "hourly": [{"t": r["t"], "pm2_5": r["pm2_5"], "pm10": r["pm10"], "samples": r["samples"], "coverage": min(1, r["samples"] / expected_hour)} for r in hourly],
-                "daily": [{"t": r["t"], "pm2_5": r["pm2_5"], "pm10": r["pm10"], "samples": r["samples"], "coverage": min(1, r["samples"] / expected_day)} for r in daily],
+                "hourly": [{"t": r["t"], "pm2_5": r["pm2_5"], "pm10": r["pm10"], "rh": r["rh"], "temp": r["temp"], "samples": r["samples"], "coverage": min(1, r["samples"] / expected_hour)} for r in hourly],
+                "daily": [{"t": r["t"], "pm2_5": r["pm2_5"], "pm10": r["pm10"], "rh": r["rh"], "temp": r["temp"], "samples": r["samples"], "coverage": min(1, r["samples"] / expected_day)} for r in daily],
                 "weekly": weekly,
             }
         )

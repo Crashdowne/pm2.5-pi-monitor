@@ -1,4 +1,4 @@
-const CACHE = "pm25-v2";
+const CACHE = "pm25-v5";
 const SHELL = ["/", "/index.html", "/app.js", "/charts.js", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (e) => {

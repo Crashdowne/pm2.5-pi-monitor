@@ -37,9 +37,8 @@ CREATE TABLE {table} (
 )
 """
 SUPPORT_SCHEMA = (
-    "CREATE INDEX IF NOT EXISTS idx_readings_raw_ts ON readings_raw(ts)",
     "CREATE TABLE IF NOT EXISTS devices ("
-    "sensor_id TEXT PRIMARY KEY, sample_period_s INTEGER NOT NULL DEFAULT 120, "
+    "sensor_id TEXT PRIMARY KEY, sample_period_s INTEGER NOT NULL DEFAULT 180, "
     "last_ingest_ts INTEGER NOT NULL DEFAULT 0, last_reading_ts INTEGER NOT NULL DEFAULT 0)",
 )
 
@@ -104,6 +103,7 @@ def _init_db(db_path: str) -> None:
 
             for statement in SUPPORT_SCHEMA:
                 conn.execute(statement)
+            conn.execute("DROP INDEX IF EXISTS idx_readings_raw_ts")
             latest = conn.execute(
                 "SELECT COALESCE(max(ts), 0) FROM readings_raw WHERE sensor_id = 'default'"
             ).fetchone()[0]
@@ -209,7 +209,7 @@ def create_app(db_path: str, token: str, device_tokens: dict[str, str] | None = 
                 received += 1
                 max_ts = max(max_ts, ts)
             try:
-                sample_period = max(1, min(3600, int(request.headers.get("X-PM25-Sample-Period", "120"))))
+                sample_period = max(1, min(3600, int(request.headers.get("X-PM25-Sample-Period", "180"))))
             except ValueError:
                 abort(400)
             conn.execute(
@@ -288,7 +288,8 @@ def create_app(db_path: str, token: str, device_tokens: dict[str, str] | None = 
         since = int(time.time()) - bucket * count
         with closing(_connect(db_path)) as conn:
             rows = conn.execute(
-                "SELECT (ts / ?) * ? AS t, avg(COALESCE(pm2_5_corr, pm2_5)) AS pm2_5, avg(pm10) AS pm10 "
+                "SELECT (ts / ?) * ? AS t, avg(COALESCE(pm2_5_corr, pm2_5)) AS pm2_5, "
+                "avg(pm10) AS pm10, avg(rh) AS rh, avg(temp) AS temp "
                 "FROM readings_raw WHERE sensor_id = ? AND ts >= ? GROUP BY t ORDER BY t",
                 (bucket, bucket, sensor_id, since),
             ).fetchall()

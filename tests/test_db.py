@@ -14,14 +14,26 @@ class DatabaseTests(unittest.TestCase):
         self.conn.close()
 
     def test_rollups_prefer_corrected_average_without_losing_sample_count(self) -> None:
-        db.insert_raw(self.conn, 3601, {"pm2_5": 20, "pm2_5_corr": 10, "pm10": 30})
-        db.insert_raw(self.conn, 3661, {"pm2_5": 30, "pm2_5_corr": 20, "pm10": 40})
+        db.insert_raw(
+            self.conn,
+            3601,
+            {"pm2_5": 20, "pm2_5_corr": 10, "pm10": 30, "rh": 40, "temp": 18},
+        )
+        db.insert_raw(
+            self.conn,
+            3661,
+            {"pm2_5": 30, "pm2_5_corr": 20, "pm10": 40, "rh": 60, "temp": 22},
+        )
         db.update_rollups(self.conn, 3661)
 
         hourly = self.conn.execute("SELECT * FROM readings_hourly WHERE ts_hour = 3600").fetchone()
         daily = self.conn.execute("SELECT * FROM readings_daily WHERE ts_day = 0").fetchone()
         self.assertEqual(hourly["pm2_5_corr"], 15)
+        self.assertEqual(hourly["rh"], 50)
+        self.assertEqual(hourly["temp"], 20)
         self.assertEqual(hourly["samples"], 2)
+        self.assertEqual(daily["rh"], 50)
+        self.assertEqual(daily["temp"], 20)
         self.assertEqual(daily["samples"], 2)
 
     def test_init_migrates_pre_correction_tables(self) -> None:

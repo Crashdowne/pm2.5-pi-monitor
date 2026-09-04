@@ -1,9 +1,10 @@
-import { drawLine } from "/charts.js";
+import { drawClimate, drawLine } from "/charts.js";
 
 const fleet = document.querySelector("#fleet");
 const status = document.querySelector("#status");
 const detail = document.querySelector("#detail");
 const history = document.querySelector("#history");
+const environmentHistory = document.querySelector("#environment-history");
 let etag = "";
 let timer = null;
 
@@ -20,6 +21,9 @@ async function selectSensor(sensorId) {
   document.querySelector("#detail-name").textContent = sensorId;
   detail.hidden = false;
   drawLine(history, rows.map((row) => ({ t: row.t, pm25: row.pm2_5, pm10: row.pm10 })), (ts) =>
+    new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  );
+  drawClimate(environmentHistory, rows.map((row) => ({ t: row.t, temp: row.temp, rh: row.rh })), (ts) =>
     new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   );
 }

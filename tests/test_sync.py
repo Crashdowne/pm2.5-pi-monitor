@@ -1,4 +1,5 @@
 import os
+import gzip
 import json
 import tempfile
 import time
@@ -24,12 +25,15 @@ class FakeResponse:
 class FakeSession:
     def __init__(self) -> None:
         self.headers: dict = {}
+        self.rows: list[dict] = []
 
     def post(self, _url: str, *, data: bytes, headers: dict, timeout: int) -> FakeResponse:
         self.headers = headers
-        rows = [line for line in data.decode("utf-8").splitlines() if line]
-        max_ts = max(json.loads(line)["ts"] for line in rows)
-        return FakeResponse({"received": len(rows), "max_ts": max_ts})
+        if headers.get("Content-Encoding") == "gzip":
+            data = gzip.decompress(data)
+        self.rows = [json.loads(line) for line in data.decode("utf-8").splitlines() if line]
+        max_ts = max(row["ts"] for row in self.rows)
+        return FakeResponse({"received": len(self.rows), "max_ts": max_ts})
 
 
 class SyncTests(unittest.TestCase):
@@ -62,6 +66,8 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(state["last_pushed_ts"], 20)
         self.assertEqual(self.conn.execute("SELECT synced FROM readings_raw WHERE ts = 20").fetchone()[0], 1)
         self.assertEqual(session.headers["X-PM25-Sensor-ID"], "porch")
+        self.assertEqual(session.headers["Content-Encoding"], "gzip")
+        self.assertNotIn("synced", session.rows[0])
 
     def test_normal_pruning_uses_storage_retention(self) -> None:
         old_ts = int(time.time()) - 20 * 86400

@@ -51,13 +51,17 @@ def _push(cfg: Config, conn, session: requests.Session) -> None:
         "X-PM25-Sample-Period": str(cfg.sensor.period_s if cfg.sensor.mode == "duty_cycle" else 60),
     }
     url = cfg.sync.server_url.rstrip("/") + "/ingest"
+    columns = ",".join(["ts", *db.RAW_COLS])
     while True:
         rows = conn.execute(
-            "SELECT * FROM readings_raw WHERE synced = 0 ORDER BY ts LIMIT ?", (cfg.sync.batch_size,)
+            f"SELECT {columns} FROM readings_raw WHERE synced = 0 ORDER BY ts LIMIT ?",
+            (cfg.sync.batch_size,),
         ).fetchall()
         if not rows:
             break
-        payload: bytes = "\n".join(json.dumps(dict(r)) for r in rows).encode("utf-8")
+        payload: bytes = "\n".join(
+            json.dumps(dict(row), separators=(",", ":")) for row in rows
+        ).encode("utf-8")
         if cfg.sync.gzip_enabled:
             payload = gzip.compress(payload, compresslevel=3)
             headers["Content-Encoding"] = "gzip"

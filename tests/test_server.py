@@ -40,7 +40,7 @@ class ServerTests(unittest.TestCase):
         headers = {"Authorization": "Bearer secret", "X-PM25-Sensor-ID": "porch"}
         self.client.post(
             "/ingest",
-            data=json.dumps({"ts": reading_ts, "pm2_5": 10.0, "pm10": 14.0, "rh": 45.0}),
+            data=json.dumps({"ts": reading_ts, "pm2_5": 10.0, "pm10": 14.0, "rh": 45.0, "temp": 21.0}),
             headers=headers,
         )
 
@@ -49,6 +49,9 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()[0]["sensor_id"], "porch")
         self.assertIn("ETag", response.headers)
+        history = self.client.get("/api/sensors/porch/history?range=24h").get_json()
+        self.assertEqual(history[0]["rh"], 45.0)
+        self.assertEqual(history[0]["temp"], 21.0)
 
     def test_existing_single_sensor_database_is_migrated(self) -> None:
         legacy_path = str(Path(self.tempdir.name) / "legacy.db")
@@ -112,6 +115,19 @@ class ServerTests(unittest.TestCase):
         response = self.client.post("/ingest", data=b"not a gzip stream", headers=headers)
 
         self.assertEqual(response.status_code, 400)
+
+    def test_unused_global_timestamp_index_is_removed(self) -> None:
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("CREATE INDEX idx_readings_raw_ts ON readings_raw(ts)")
+        conn.commit()
+        conn.close()
+
+        create_app(self.db_path, "", {"porch": "secret"})
+
+        conn = sqlite3.connect(self.db_path)
+        indexes = {row[1] for row in conn.execute("PRAGMA index_list(readings_raw)")}
+        conn.close()
+        self.assertNotIn("idx_readings_raw_ts", indexes)
 
 
 if __name__ == "__main__":

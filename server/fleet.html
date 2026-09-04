@@ -21,6 +21,7 @@
   .aqi { display: inline-block; min-width: 42px; padding: 4px 7px; color: #111; text-align: center; font-weight: 700; border-radius: 4px; }
   .detail { margin-top: 28px; } .detail[hidden] { display: none; }
   .detail-head { display: flex; justify-content: space-between; margin-bottom: 12px; }
+  .chart-label { color: var(--muted); font-size: 12px; margin: 16px 0 8px; }
   canvas { width: 100%; height: 190px; display: block; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
 </style>
 </head>
@@ -35,7 +36,10 @@
   </div>
   <section class="detail" id="detail" hidden>
     <div class="detail-head"><h2 id="detail-name"></h2><span class="muted">Last 24 hours</span></div>
+    <div class="chart-label">Particulate matter</div>
     <canvas id="history" role="img" aria-label="Selected sensor particulate history"></canvas>
+    <div class="chart-label">Temperature &amp; relative humidity</div>
+    <canvas id="environment-history" role="img" aria-label="Selected sensor temperature and relative humidity history"></canvas>
   </section>
 </main>
 <script type="module" src="/fleet.js"></script>

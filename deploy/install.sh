@@ -47,6 +47,11 @@ UV="$(command -v uv)"
 ( cd "$REPO" && "$UV" sync --extra pi )
 PYTHON="$REPO/.venv/bin/python"
 
+# --- create the complete application schema before services start ---
+"$PYTHON" -c 'from pm25 import db; from pm25.config import load_config; cfg = load_config("/etc/pm25/config.toml"); conn = db.connect(cfg.storage.db_path); db.init_db(conn); conn.close()'
+chown -R pm25-reader:pm25-data /var/lib/pm25
+chmod -R g+rwX /var/lib/pm25
+
 # --- free the UART for the PMS5003 (hand PL011 to the GPIO header) ---
 BOOT=/boot/firmware/config.txt;     [[ -f $BOOT ]]    || BOOT=/boot/config.txt
 CMDLINE=/boot/firmware/cmdline.txt; [[ -f $CMDLINE ]] || CMDLINE=/boot/cmdline.txt
@@ -69,7 +74,12 @@ for u in pm25-reader.service pm25-web.service pm25-sync.service pm25-sync.timer 
   sed -e "s#{{REPO}}#$REPO#g" -e "s#{{PYTHON}}#$PYTHON#g" -e "s#{{HARDWARE_GROUPS}}#$HARDWARE_GROUPS#g" "$REPO/deploy/$u" > "/etc/systemd/system/$u"
 done
 systemctl daemon-reload
-systemctl enable --now pm25-reader.service pm25-web.service pm25-sync.timer pm25-alert.timer
+systemctl enable --now pm25-reader.service pm25-web.service pm25-sync.timer
+if "$PYTHON" -c 'from pm25.config import load_config; raise SystemExit(not load_config("/etc/pm25/config.toml").alerts.enabled)'; then
+  systemctl enable --now pm25-alert.timer
+else
+  systemctl disable --now pm25-alert.timer
+fi
 
 cat <<EOF
 

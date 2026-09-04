@@ -5,6 +5,8 @@ const PAD = { l: 34, r: 8, t: 10, b: 20 };
 const GRID = "#1e293b";
 const AXIS = "#64748b";
 const PM10_COLOR = "#38bdf8";
+const TEMP_COLOR = "#fb7185";
+const RH_COLOR = "#22d3ee";
 
 export function drawLine(canvas, data, labelFn) {
   registry.set(canvas, { kind: "line", data, labelFn });
@@ -13,6 +15,11 @@ export function drawLine(canvas, data, labelFn) {
 
 export function drawBars(canvas, data, labelFn) {
   registry.set(canvas, { kind: "bars", data, labelFn });
+  render(canvas);
+}
+
+export function drawClimate(canvas, data, labelFn) {
+  registry.set(canvas, { kind: "climate", data, labelFn });
   render(canvas);
 }
 
@@ -38,11 +45,80 @@ function setup(canvas) {
   return { ctx, w, h };
 }
 
-function empty(ctx, w, h) {
+function empty(ctx, w, h, label = "No data yet") {
   ctx.fillStyle = AXIS;
   ctx.font = "13px system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("No data yet", w / 2, h / 2);
+  ctx.fillText(label, w / 2, h / 2);
+}
+
+function drawSeries(ctx, data, x, y, key, color) {
+  let started = false;
+  ctx.beginPath();
+  data.forEach((point, index) => {
+    const value = point[key];
+    if (value == null) {
+      started = false;
+      return;
+    }
+    if (started) ctx.lineTo(x(index), y(value));
+    else ctx.moveTo(x(index), y(value));
+    started = true;
+  });
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = color;
+  data.forEach((point, index) => {
+    if (point[key] == null) return;
+    ctx.beginPath();
+    ctx.arc(x(index), y(point[key]), 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function renderClimate(ctx, w, h, data, labelFn) {
+  const temperatures = data.map((point) => point.temp).filter((value) => value != null);
+  const humidities = data.map((point) => point.rh).filter((value) => value != null);
+  if (!temperatures.length && !humidities.length) return empty(ctx, w, h, "No SHT31 history yet");
+
+  const left = 34, right = 34, top = PAD.t, bottom = h - PAD.b;
+  const n = data.length;
+  const x = (index) => left + (n === 1 ? (w - left - right) / 2 : (index / (n - 1)) * (w - left - right));
+  const tempMin = temperatures.length ? Math.floor(Math.min(...temperatures) - 2) : 0;
+  const tempMax = temperatures.length ? Math.ceil(Math.max(...temperatures) + 2) : 40;
+  const tempSpan = Math.max(1, tempMax - tempMin);
+  const tempY = (value) => bottom - ((value - tempMin) / tempSpan) * (bottom - top);
+  const rhY = (value) => bottom - (value / 100) * (bottom - top);
+
+  ctx.lineWidth = 1;
+  ctx.font = "10px system-ui, sans-serif";
+  for (let index = 0; index <= 4; index++) {
+    const fraction = index / 4;
+    const y = bottom - fraction * (bottom - top);
+    ctx.strokeStyle = GRID;
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(w - right, y);
+    ctx.stroke();
+    ctx.fillStyle = TEMP_COLOR;
+    ctx.textAlign = "right";
+    ctx.fillText(`${Math.round(tempMin + fraction * tempSpan)}°`, left - 4, y + 3);
+    ctx.fillStyle = RH_COLOR;
+    ctx.textAlign = "left";
+    ctx.fillText(`${Math.round(fraction * 100)}%`, w - right + 4, y + 3);
+  }
+
+  drawSeries(ctx, data, x, tempY, "temp", TEMP_COLOR);
+  drawSeries(ctx, data, x, rhY, "rh", RH_COLOR);
+
+  ctx.fillStyle = AXIS;
+  ctx.textAlign = "center";
+  const ticks = Math.min(4, n);
+  for (let index = 0; index < ticks; index++) {
+    const pointIndex = Math.round((n - 1) * (index / Math.max(1, ticks - 1)));
+    ctx.fillText(labelFn(data[pointIndex].t), x(pointIndex), h - 6);
+  }
 }
 
 function render(canvas) {
@@ -51,6 +127,7 @@ function render(canvas) {
   const { ctx, w, h } = setup(canvas);
   const data = item.data || [];
   if (!data.length) return empty(ctx, w, h);
+  if (item.kind === "climate") return renderClimate(ctx, w, h, data, item.labelFn);
 
   const maxV = Math.max(20, ...data.map((d) => Math.max(d.pm25 || 0, d.pm10 || 0))) * 1.1;
   const top = PAD.t, bottom = h - PAD.b;

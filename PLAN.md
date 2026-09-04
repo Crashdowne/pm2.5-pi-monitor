@@ -175,8 +175,8 @@ Minimum for reading = VCC, GND, TXD→RXD. Logic is 3.3 V TTL, so no level shift
 - Open `pms5003`; **1-minute averaging** written as one row (raw 1 Hz frames are averaged in
   RAM, not all persisted → less SD wear, smoother "current").
 - **Duty-cycle mode (default):** wake, warm up 30 s, average an ~8 s burst, then sleep the
-  rest of a **120 s** period → ~30 samples/h (ample for hourly/daily/weekly + a 2-min-fresh
-  live tile), ~3× less fan runtime. **Continuous mode** (1-min averages) available via config.
+  rest of a **180 s** period → ~20 samples/h (ample for hourly/daily/weekly + a 3-min-fresh
+  live tile), ~4.7× less fan runtime. **Continuous mode** (1-min averages) available via config.
 - **SHT31-D** temp/RH is **enabled**; it stamps `rh`/`temp` on each row and drives the
   EPA/Barkjohn PM2.5 correction (stored as `pm2_5_corr`; dashboard/AQI prefer it).
 - Validate checksum; drop bad frames; expose last-good timestamp for health.
@@ -191,14 +191,22 @@ CREATE TABLE readings_raw(   -- 1-min averages
   n0_3 INTEGER, n0_5 INTEGER, n1_0 INTEGER, n2_5 INTEGER, n5_0 INTEGER, n10 INTEGER,
   rh REAL, temp REAL         -- nullable, if the SHT31 present
 );
-CREATE TABLE readings_hourly(ts_hour INTEGER PRIMARY KEY, pm2_5 REAL, pm10 REAL, samples INTEGER);
-CREATE TABLE readings_daily (ts_day  INTEGER PRIMARY KEY, pm2_5 REAL, pm10 REAL, samples INTEGER);
+CREATE TABLE readings_hourly(
+  ts_hour INTEGER PRIMARY KEY, pm2_5 REAL, pm10 REAL, pm2_5_corr REAL,
+  rh REAL, temp REAL, samples INTEGER
+);
+CREATE TABLE readings_daily(
+  ts_day INTEGER PRIMARY KEY, pm2_5 REAL, pm10 REAL, pm2_5_corr REAL,
+  rh REAL, temp REAL, samples INTEGER
+);
 CREATE TABLE sync_state(id INTEGER PRIMARY KEY CHECK(id=1), last_pushed_ts INTEGER, server_max_ts INTEGER);
 ```
 
 - Rollup tables are updated incrementally by the reader/aggregator. Weekly = derived from
   `readings_daily`. Keeping rollups lets us **prune raw locally while retaining long history
   offline** for the dashboard.
+- The install script creates the complete schema, including nullable SHT31 rollup columns,
+  before starting any services.
 
 ### 6.3 `aqi.py`
 - Breakpoint tables (§2.3), the interpolation formula, category+color lookup, and **NowCast**
@@ -215,14 +223,14 @@ Serves JSON + the static PWA.
 | `GET /api/health` | sensor ok?, last read, DB size, sync watermark |
 | `GET /` `/manifest.webmanifest` `/sw.js` `/icons/*` | PWA shell |
 
-Live updates via **short polling** (~5 s) — trivial and plenty for air quality; avoids
-SSE/websocket overhead.
+Live values poll around the sensor's expected next reading and use conditional `ETag`
+requests. Aggregate charts refresh every 5 minutes; hidden tabs pause both schedules.
 
 ### 6.5 PWA dashboard (`web/`)
 - **No framework, no bundler.** Vanilla JS + **custom Canvas charts** (zero dependencies,
   fully offline) — AQI color-coding and gradient fills without a chart library.
-- **Views:** big "current" tile (PM2.5 & PM10 value + AQI badge/color), hourly line chart
-  (last 24–48 h), daily-average bars (30 d), weekly-average bars (12 w).
+- **Views:** big "current" tile (PM2.5 & PM10 value + AQI badge/color), hourly PM line chart,
+  hourly SHT31 temperature/RH chart, daily-average bars (30 d), and weekly-average bars (12 w).
 - **Installable + offline:** `manifest.webmanifest` (name, icons, `display: standalone`,
   theme color) + **service worker** caching the app shell and last-known payload so it opens
   offline and shows last readings.
@@ -318,9 +326,9 @@ pm2.5-pi-monitor/
 ## 13. Locked decisions (2026-09-03)
 
 1. **AQI standard:** US EPA (PM2.5 May-2024 table + PM10). No EU/UK bands for now.
-2. **Sampling:** duty-cycle by default — 120 s period (30 s warm-up + ~8 s burst, sensor
-   asleep the rest) → ~30 samples/h, 720/day. Ample for hourly/daily/weekly plus a
-   2-min-fresh live tile, while cutting fan runtime ~3× vs continuous. Tunable via
+2. **Sampling:** duty-cycle by default — 180 s period (30 s warm-up + ~8 s burst, sensor
+  asleep the rest) → ~20 samples/h, 480/day. Ample for hourly/daily/weekly plus a
+  3-min-fresh live tile, while cutting fan runtime ~4.7× vs continuous. Tunable via
    `period_s`, or switch to `continuous` for denser data.
 3. **Server DB:** SQLite (lightweight, same schema as the Pi). Can migrate to Postgres/Timescale later.
 4. **Frontend:** no-build vanilla JS + **custom Canvas charts** (zero dependencies, fully offline).

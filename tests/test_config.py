@@ -16,6 +16,7 @@ class ConfigTests(unittest.TestCase):
         cfg = self._load("[sensor]\nmode = 'continuous'\n")
 
         self.assertEqual(cfg.sensor.mode, "continuous")
+        self.assertEqual(cfg.sensor.period_s, 180)
 
     def test_negative_retention_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "raw_retention_days"):

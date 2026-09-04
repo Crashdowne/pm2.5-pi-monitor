@@ -1,4 +1,4 @@
-import { drawLine, drawBars } from "/charts.js";
+import { drawLine, drawBars, drawClimate } from "/charts.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -92,10 +92,19 @@ function renderHealth(health) {
 }
 
 let refreshTimer = null;
+let chartRefreshTimer = null;
 let failureCount = 0;
-let latestReadingTs = null;
 let chartsLoaded = false;
 let refreshInFlight = false;
+let chartsInFlight = false;
+let lastChartRefresh = 0;
+const CHART_REFRESH_MS = 5 * 60 * 1000;
+
+function scheduleChartRefresh(delayMs = CHART_REFRESH_MS) {
+  clearTimeout(chartRefreshTimer);
+  if (document.hidden) return;
+  chartRefreshTimer = setTimeout(refreshCharts, delayMs);
+}
 
 function scheduleRefresh(current, failed = false) {
   clearTimeout(refreshTimer);
@@ -141,10 +150,7 @@ async function refreshCurrent() {
     $("#status").textContent = cached
       ? `Monitor unavailable · Showing reading from ${new Date(c.ts * 1000).toLocaleString()}`
       : `Updated ${duration(age)} ago${rh}${temp}${c.pm2_5_corr != null ? " · humidity-corrected" : ""}`;
-    if (!chartsLoaded || latestReadingTs !== c.ts) {
-      latestReadingTs = c.ts;
-      await refreshCharts();
-    }
+    if (!chartsLoaded) await refreshCharts();
     scheduleRefresh(c);
   } catch {
     failureCount += 1;
@@ -168,19 +174,47 @@ function updateChartSummary(name, rows) {
   summary.textContent = `${rows.length} points. PM2.5 minimum ${fmt(Math.min(...values))}, maximum ${fmt(Math.max(...values))}, latest ${fmt(latest.pm25)} micrograms per cubic metre.`;
 }
 
+function updateClimateSummary(rows) {
+  const summary = $("#environment-summary");
+  const temperatures = rows.map((row) => row.temp).filter((value) => value != null);
+  const humidities = rows.map((row) => row.rh).filter((value) => value != null);
+  if (!temperatures.length && !humidities.length) {
+    summary.textContent = "No SHT31 history yet.";
+    return;
+  }
+  const parts = [];
+  if (temperatures.length) {
+    parts.push(`Temperature minimum ${fmt(Math.min(...temperatures))}, maximum ${fmt(Math.max(...temperatures))} degrees Celsius`);
+  }
+  if (humidities.length) {
+    parts.push(`relative humidity minimum ${fmt(Math.min(...humidities))}, maximum ${fmt(Math.max(...humidities))} percent`);
+  }
+  summary.textContent = `${rows.length} hourly points. ${parts.join("; ")}.`;
+}
+
 async function refreshCharts() {
+  if (chartsInFlight || document.hidden) return;
+  chartsInFlight = true;
+  clearTimeout(chartRefreshTimer);
   try {
     const a = await getJSON("/api/averages");
     const map = (rows) => rows.map((x) => ({ t: x.t, pm25: x.pm2_5, pm10: x.pm10 }));
     drawLine($("#hourly"), map(a.hourly), hourLabel);
     drawBars($("#daily"), map(a.daily), dayLabel);
     drawBars($("#weekly"), map(a.weekly), dayLabel);
+    const climate = a.hourly.map((row) => ({ t: row.t, temp: row.temp, rh: row.rh }));
+    drawClimate($("#environment"), climate, hourLabel);
     updateChartSummary("hourly", map(a.hourly));
     updateChartSummary("daily", map(a.daily));
     updateChartSummary("weekly", map(a.weekly));
+    updateClimateSummary(climate);
     chartsLoaded = true;
+    lastChartRefresh = Date.now();
   } catch {
     /* keep last render */
+  } finally {
+    chartsInFlight = false;
+    scheduleChartRefresh();
   }
 }
 
@@ -188,7 +222,13 @@ refreshCurrent();
 
 document.addEventListener("visibilitychange", () => {
   clearTimeout(refreshTimer);
-  if (!document.hidden) refreshCurrent();
+  clearTimeout(chartRefreshTimer);
+  if (!document.hidden) {
+    refreshCurrent();
+    const remaining = CHART_REFRESH_MS - (Date.now() - lastChartRefresh);
+    if (!chartsLoaded || remaining <= 0) refreshCharts();
+    else scheduleChartRefresh(remaining);
+  }
 });
 window.addEventListener("focus", refreshCurrent);
 window.addEventListener("online", refreshCurrent);

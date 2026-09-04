@@ -36,7 +36,13 @@ for u in pm25-reader.service pm25-web.service pm25-sync.service pm25-sync.timer 
 	sed -e "s#{{REPO}}#$REPO#g" -e "s#{{PYTHON}}#$PYTHON#g" -e "s#{{HARDWARE_GROUPS}}#$HARDWARE_GROUPS#g" "$REPO/deploy/$u" > "/etc/systemd/system/$u"
 done
 systemctl daemon-reload
-systemctl enable pm25-sync.timer pm25-alert.timer
-systemctl restart pm25-reader.service pm25-web.service pm25-sync.timer pm25-alert.timer
+systemctl enable pm25-sync.timer
+systemctl restart pm25-reader.service pm25-web.service pm25-sync.timer
+if "$PYTHON" -c 'from pm25.config import load_config; raise SystemExit(not load_config("/etc/pm25/config.toml").alerts.enabled)'; then
+	systemctl enable pm25-alert.timer
+	systemctl restart pm25-alert.timer
+else
+	systemctl disable --now pm25-alert.timer
+fi
 
 echo "Updated to $(git rev-parse --short HEAD)"
