@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS reader_status (
     valid_frames_total INTEGER NOT NULL DEFAULT 0,
     checksum_errors_total INTEGER NOT NULL DEFAULT 0,
     timeout_reads_total INTEGER NOT NULL DEFAULT 0,
+    transport_errors_total INTEGER NOT NULL DEFAULT 0,
     sensor_resets_total INTEGER NOT NULL DEFAULT 0,
     serial_reopens_total INTEGER NOT NULL DEFAULT 0,
     sht31_failures_total INTEGER NOT NULL DEFAULT 0,
@@ -97,6 +98,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         ("backlog_rows", "INTEGER NOT NULL DEFAULT 0"),
     ):
         _ensure_column(conn, "sync_state", column, decl)
+    _ensure_column(conn, "reader_status", "transport_errors_total", "INTEGER NOT NULL DEFAULT 0")
     conn.execute("INSERT OR IGNORE INTO sync_state (id) VALUES (1)")
     conn.execute("INSERT OR IGNORE INTO reader_status (id) VALUES (1)")
     conn.commit()
@@ -106,7 +108,14 @@ def insert_raw(conn: sqlite3.Connection, ts: int, values: dict) -> None:
     cols = ",".join(["ts", *RAW_COLS])
     placeholders = ",".join(["?"] * (1 + len(RAW_COLS)))
     row = [ts, *[values.get(c) for c in RAW_COLS]]
-    conn.execute(f"INSERT OR REPLACE INTO readings_raw ({cols}) VALUES ({placeholders})", row)
+    updates = ",".join(f"{column}=excluded.{column}" for column in RAW_COLS)
+    changed = " OR ".join(f"readings_raw.{column} IS NOT excluded.{column}" for column in RAW_COLS)
+    conn.execute(
+        f"INSERT INTO readings_raw ({cols}) VALUES ({placeholders}) "
+        f"ON CONFLICT(ts) DO UPDATE SET {updates}, "
+        f"synced=CASE WHEN {changed} THEN 0 ELSE readings_raw.synced END",
+        row,
+    )
 
 
 def update_rollups(conn: sqlite3.Connection, ts: int) -> None:
@@ -144,6 +153,7 @@ def record_reader_cycle(
     valid_frames: int,
     checksum_errors: int,
     timeout_reads: int,
+    transport_errors: int = 0,
     sht31_ok: bool | None,
     recovery: str | None = None,
 ) -> None:
@@ -155,6 +165,7 @@ def record_reader_cycle(
         "valid_frames_total = valid_frames_total + ?, "
         "checksum_errors_total = checksum_errors_total + ?, "
         "timeout_reads_total = timeout_reads_total + ?, "
+        "transport_errors_total = transport_errors_total + ?, "
         "sensor_resets_total = sensor_resets_total + ?, "
         "serial_reopens_total = serial_reopens_total + ?, "
         "sht31_failures_total = sht31_failures_total + ?, "
@@ -167,6 +178,7 @@ def record_reader_cycle(
             valid_frames,
             checksum_errors,
             timeout_reads,
+            transport_errors,
             recovery in ("reset", "reopen"),
             recovery == "reopen",
             sht31_ok is False,

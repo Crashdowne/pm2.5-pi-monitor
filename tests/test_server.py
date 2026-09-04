@@ -102,6 +102,17 @@ class ServerTests(unittest.TestCase):
         conn.close()
         self.assertEqual(count, 0)
 
+    def test_malformed_gzip_is_rejected(self) -> None:
+        headers = {
+            "Authorization": "Bearer secret",
+            "X-PM25-Sensor-ID": "porch",
+            "Content-Encoding": "gzip",
+        }
+
+        response = self.client.post("/ingest", data=b"not a gzip stream", headers=headers)
+
+        self.assertEqual(response.status_code, 400)
+
 
 if __name__ == "__main__":
     unittest.main()

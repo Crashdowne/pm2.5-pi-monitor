@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import tomllib
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -78,6 +79,43 @@ class Config:
     alerts: AlertConfig = field(default_factory=AlertConfig)
 
 
+_SENSOR_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+def _validate_config(cfg: Config) -> None:
+    sensor = cfg.sensor
+    if sensor.mode not in ("duty_cycle", "continuous"):
+        raise ValueError("sensor.mode must be 'duty_cycle' or 'continuous'")
+    if sensor.period_s < 1 or sensor.warmup_s < 0 or sensor.sample_s < 1:
+        raise ValueError("sensor timing values must be positive")
+    if sensor.mode == "duty_cycle" and sensor.period_s <= sensor.warmup_s + sensor.sample_s:
+        raise ValueError("sensor.period_s must exceed warmup_s + sample_s in duty_cycle mode")
+    if sensor.reset_after_failures < 0 or sensor.reopen_after_failures < 0:
+        raise ValueError("sensor recovery thresholds cannot be negative")
+    if cfg.storage.raw_retention_days < 1:
+        raise ValueError("storage.raw_retention_days must be at least 1")
+    if not 1 <= cfg.web.port <= 65535:
+        raise ValueError("web.port must be between 1 and 65535")
+
+    sync = cfg.sync
+    if not _SENSOR_ID_RE.fullmatch(sync.sensor_id):
+        raise ValueError("sync.sensor_id must contain only letters, digits, '.', '_' or '-'")
+    if not 1 <= sync.batch_size <= 1000:
+        raise ValueError("sync.batch_size must be between 1 and 1000")
+    if not 1 <= sync.pressure_keep_days <= cfg.storage.raw_retention_days:
+        raise ValueError("sync.pressure_keep_days must be between 1 and raw_retention_days")
+    if sync.trigger_db_size_mb < 0 or sync.trigger_disk_free_mb < 0 or not 0 <= sync.retry_total <= 10:
+        raise ValueError("sync thresholds must be non-negative and retry_total cannot exceed 10")
+
+    alerts = cfg.alerts
+    if not 0 <= alerts.recovery_aqi <= alerts.threshold_aqi <= 500:
+        raise ValueError("alert AQI thresholds must satisfy 0 <= recovery <= threshold <= 500")
+    if alerts.consecutive_runs < 1 or alerts.cooldown_s < 0:
+        raise ValueError("alert consecutive_runs must be positive and cooldown_s cannot be negative")
+    if alerts.stale_after_s < 1 or alerts.sync_lag_s < 1 or alerts.disk_free_mb < 0 or alerts.request_timeout_s < 1:
+        raise ValueError("alert health thresholds must be positive")
+
+
 def _pin(value: object) -> int | None:
     """TOML has no null, so a negative pin number means 'not wired'."""
     if value is None:
@@ -151,4 +189,6 @@ def load_config(path: str | Path) -> Config:
         request_timeout_s=int(a.get("request_timeout_s", 10)),
     )
 
-    return Config(sensor=sensor, storage=storage, web=web, sync=sync, alerts=alerts)
+    cfg = Config(sensor=sensor, storage=storage, web=web, sync=sync, alerts=alerts)
+    _validate_config(cfg)
+    return cfg

@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from pm25.pms5003 import ChecksumError, PMS5003
+from pm25.pms5003 import ChecksumError, PMS5003, SensorTransportError
 from pm25.sensor_sht31 import SHT31
 
 
@@ -13,6 +13,11 @@ class FakeSerial:
         out = bytes(self.data[:size])
         del self.data[:size]
         return out
+
+
+class FailingSerial:
+    def read(self, size: int) -> bytes:
+        raise OSError("UART disconnected")
 
 
 def frame(*, valid_checksum: bool = True) -> bytes:
@@ -43,6 +48,22 @@ class SensorProtocolTests(unittest.TestCase):
         sensor.read_timeout = 0.1
 
         with self.assertRaises(ChecksumError):
+            sensor.read()
+
+    def test_pms5003_rejects_unexpected_frame_length(self) -> None:
+        sensor = PMS5003.__new__(PMS5003)
+        sensor._serial = FakeSerial(bytes((0x42, 0x4D, 0x00, 0x20)))
+        sensor.read_timeout = 0.1
+
+        with self.assertRaisesRegex(ChecksumError, "frame length"):
+            sensor.read()
+
+    def test_pms5003_wraps_uart_transport_errors(self) -> None:
+        sensor = PMS5003.__new__(PMS5003)
+        sensor._serial = FailingSerial()
+        sensor.read_timeout = 0.1
+
+        with self.assertRaisesRegex(SensorTransportError, "UART disconnected"):
             sensor.read()
 
     def test_sht31_crc_reference_vector(self) -> None:

@@ -97,6 +97,7 @@ def create_app(cfg: Config) -> Flask:
                 "consecutive_failures": failures,
                 "valid_frames_total": reader["valid_frames_total"] if reader else 0,
                 "checksum_errors_total": reader["checksum_errors_total"] if reader else 0,
+                "transport_errors_total": reader["transport_errors_total"] if reader else 0,
                 "timeout_reads_total": reader["timeout_reads_total"] if reader else 0,
                 "sensor_resets_total": reader["sensor_resets_total"] if reader else 0,
                 "serial_reopens_total": reader["serial_reopens_total"] if reader else 0,

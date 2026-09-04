@@ -34,6 +34,17 @@ class DatabaseTests(unittest.TestCase):
         self.assertIn("pm2_5_corr", columns)
         conn.close()
 
+    def test_upsert_only_requeues_changed_measurements(self) -> None:
+        db.insert_raw(self.conn, 100, {"pm2_5": 8.0, "pm10": 12.0})
+        self.conn.execute("UPDATE readings_raw SET synced = 1 WHERE ts = 100")
+
+        db.insert_raw(self.conn, 100, {"pm2_5": 8.0, "pm10": 12.0})
+        self.assertEqual(self.conn.execute("SELECT synced FROM readings_raw").fetchone()[0], 1)
+
+        db.insert_raw(self.conn, 100, {"pm2_5": 9.0, "pm10": 12.0})
+        row = self.conn.execute("SELECT pm2_5, synced FROM readings_raw").fetchone()
+        self.assertEqual((row["pm2_5"], row["synced"]), (9.0, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

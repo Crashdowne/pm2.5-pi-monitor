@@ -28,6 +28,10 @@ class ChecksumError(RuntimeError):
     pass
 
 
+class SensorTransportError(RuntimeError):
+    pass
+
+
 class PMS5003:
     def __init__(
         self,
@@ -87,25 +91,28 @@ class PMS5003:
         """Return one decoded frame, or None on timeout. Raises ChecksumError on a bad frame."""
         ser = self._serial
         deadline = time.monotonic() + self.read_timeout
-        while True:  # scan for start-of-frame
-            if time.monotonic() > deadline:
-                return None
-            b = ser.read(1)
-            if not b or b[0] != _SOF[0]:
-                continue
-            b2 = ser.read(1)
-            if b2 and b2[0] == _SOF[1]:
-                break
+        try:
+            while True:  # scan for start-of-frame
+                if time.monotonic() > deadline:
+                    return None
+                b = ser.read(1)
+                if not b or b[0] != _SOF[0]:
+                    continue
+                b2 = ser.read(1)
+                if b2 and b2[0] == _SOF[1]:
+                    break
 
-        header = ser.read(2)
-        if len(header) != 2:
-            return None
-        frame_len = (header[0] << 8) | header[1]
-        if not 4 <= frame_len <= 64:
-            return None
-        body = ser.read(frame_len)
-        if len(body) != frame_len:
-            return None
+            header = ser.read(2)
+            if len(header) != 2:
+                return None
+            frame_len = (header[0] << 8) | header[1]
+            if frame_len != 28:
+                raise ChecksumError(f"unexpected PMS5003 frame length: {frame_len}")
+            body = ser.read(frame_len)
+            if len(body) != frame_len:
+                return None
+        except (OSError, IOError) as exc:
+            raise SensorTransportError(str(exc)) from exc
 
         checksum = _SOF[0] + _SOF[1] + header[0] + header[1] + sum(body[:-2])
         expected = (body[-2] << 8) | body[-1]

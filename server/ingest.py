@@ -197,10 +197,15 @@ def create_app(db_path: str, token: str, device_tokens: dict[str, str] | None = 
 
         conn = _connect(db_path)
         try:
+            updates = ",".join(f"{column}=excluded.{column}" for column in RAW_COLS)
             for rec in records:
                 ts = rec["ts"]
                 values = [sensor_id, ts, *[rec[c] for c in RAW_COLS]]
-                conn.execute(f"INSERT OR REPLACE INTO readings_raw ({cols}) VALUES ({placeholders})", values)
+                conn.execute(
+                    f"INSERT INTO readings_raw ({cols}) VALUES ({placeholders}) "
+                    f"ON CONFLICT(sensor_id, ts) DO UPDATE SET {updates}",
+                    values,
+                )
                 received += 1
                 max_ts = max(max_ts, ts)
             try:

@@ -59,13 +59,13 @@ Update in place: `sudo deploy/update.sh` (`git pull` + `uv sync` + restart).
 
 1. Stand up the server (see below) and note its MagicDNS name / tailnet IP.
 2. On the Pi, put the shared token in `/etc/pm25/sync.env`:
-   `PM25_SYNC_TOKEN=<token>` (readable only by root and the `pm25` service group).
+   `PM25_SYNC_TOKEN=<token>` (readable only by root, sync, and alert services).
 3. In `/etc/pm25/config.toml` set `[sync] enabled = true`, `server_url`, and a unique
    `sensor_id` when operating multiple monitors.
 4. `sudo systemctl restart pm25-sync.timer`.
 
-The Pi pushes new raw rows, learns the server's high-water mark, and only ever prunes rows the
-server has already stored. Rollups stay on the Pi so the weekly view works offline.
+The Pi pushes unacknowledged raw rows and marks each row only after the server accepts its batch.
+Pruning removes only acknowledged rows. Rollups stay on the Pi so the weekly view works offline.
 
 ## Server (warehouse)
 

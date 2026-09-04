@@ -94,7 +94,7 @@ def run_once(cfg: Config, *, now: int | None = None, sender: Sender | None = Non
         ),
         (
             "sensor_stale",
-            last_ts is not None and current_time - last_ts > cfg.alerts.stale_after_s,
+            last_ts is None or current_time - last_ts > cfg.alerts.stale_after_s,
             current_time - last_ts if last_ts else None,
             1,
             "The particulate sensor has stopped producing fresh readings.",

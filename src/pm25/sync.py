@@ -68,10 +68,7 @@ def _push(cfg: Config, conn, session: requests.Session) -> None:
             raise RuntimeError("server did not acknowledge the complete ingest batch")
         timestamps = [row["ts"] for row in rows]
         last = max(timestamps)
-        conn.execute(
-            f"UPDATE readings_raw SET synced = 1 WHERE ts IN ({','.join('?' for _ in timestamps)})",
-            timestamps,
-        )
+        conn.executemany("UPDATE readings_raw SET synced = 1 WHERE ts = ?", ((ts,) for ts in timestamps))
         conn.execute("UPDATE sync_state SET last_pushed_ts = ? WHERE id = 1", (last,))
         conn.commit()
         log.info("pushed %d rows (through ts=%d)", len(rows), last)

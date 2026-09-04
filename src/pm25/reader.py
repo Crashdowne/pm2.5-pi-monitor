@@ -9,7 +9,7 @@ from typing import Protocol
 
 from . import aqi, db
 from .config import Config, load_config
-from .pms5003 import PMS5003, ChecksumError
+from .pms5003 import PMS5003, ChecksumError, SensorTransportError
 
 log = logging.getLogger("pm25.reader")
 
@@ -77,10 +77,11 @@ def _write(conn, ts: int, avg: dict, sht) -> bool | None:
     return sht31_ok
 
 
-def _collect_burst(sensor: ParticleSensor, seconds: float) -> tuple[list[dict], int, int]:
+def _collect_burst(sensor: ParticleSensor, seconds: float) -> tuple[list[dict], int, int, int]:
     samples: list[dict] = []
     checksum_errors = 0
     timeout_reads = 0
+    transport_errors = 0
     end = time.monotonic() + seconds
     while not _stop and time.monotonic() < end:
         try:
@@ -88,11 +89,14 @@ def _collect_burst(sensor: ParticleSensor, seconds: float) -> tuple[list[dict], 
         except ChecksumError:
             checksum_errors += 1
             continue
+        except SensorTransportError:
+            transport_errors += 1
+            break
         if r:
             samples.append(r)
         else:
             timeout_reads += 1
-    return samples, checksum_errors, timeout_reads
+    return samples, checksum_errors, timeout_reads, transport_errors
 
 
 def _recover_sensor(sensor: ParticleSensor, cfg: Config, consecutive_failures: int) -> str | None:
@@ -115,7 +119,7 @@ def _run_duty_cycle(conn, sensor: ParticleSensor, cfg: Config, sht) -> None:
     while not _stop:
         sensor.wake()
         _sleep(s.warmup_s)
-        samples, checksum_errors, timeout_reads = _collect_burst(sensor, s.sample_s)
+        samples, checksum_errors, timeout_reads, transport_errors = _collect_burst(sensor, s.sample_s)
         sensor.sleep()
         cycle_ts = int(time.time())
         if samples:
@@ -129,6 +133,7 @@ def _run_duty_cycle(conn, sensor: ParticleSensor, cfg: Config, sht) -> None:
                 valid_frames=len(samples),
                 checksum_errors=checksum_errors,
                 timeout_reads=timeout_reads,
+                transport_errors=transport_errors,
                 sht31_ok=sht31_ok,
             )
             log.info("sample pm2.5=%.1f pm10=%.1f (n=%d)", avg["pm2_5"], avg["pm10"], len(samples))
@@ -143,6 +148,7 @@ def _run_duty_cycle(conn, sensor: ParticleSensor, cfg: Config, sht) -> None:
                 valid_frames=0,
                 checksum_errors=checksum_errors,
                 timeout_reads=timeout_reads,
+                transport_errors=transport_errors,
                 sht31_ok=None,
                 recovery=recovery,
             )
@@ -157,6 +163,7 @@ def _run_continuous(conn, sensor: ParticleSensor, cfg: Config, sht) -> None:
     consecutive_failures = 0
     checksum_errors = 0
     timeout_reads = 0
+    transport_errors = 0
     next_write = (int(time.time()) // 60 + 1) * 60
     while not _stop:
         try:
@@ -165,6 +172,10 @@ def _run_continuous(conn, sensor: ParticleSensor, cfg: Config, sht) -> None:
                 buf.append(r)
         except ChecksumError:
             checksum_errors += 1
+        except SensorTransportError:
+            transport_errors += 1
+            buf = []
+            _sleep(max(0, next_write - time.time()))
         else:
             if not r:
                 timeout_reads += 1
@@ -181,6 +192,7 @@ def _run_continuous(conn, sensor: ParticleSensor, cfg: Config, sht) -> None:
                     valid_frames=len(buf),
                     checksum_errors=checksum_errors,
                     timeout_reads=timeout_reads,
+                    transport_errors=transport_errors,
                     sht31_ok=sht31_ok,
                 )
                 log.info("minute pm2.5=%.1f pm10=%.1f (n=%d)", avg["pm2_5"], avg["pm10"], len(buf))
@@ -196,12 +208,14 @@ def _run_continuous(conn, sensor: ParticleSensor, cfg: Config, sht) -> None:
                     valid_frames=0,
                     checksum_errors=checksum_errors,
                     timeout_reads=timeout_reads,
+                    transport_errors=transport_errors,
                     sht31_ok=None,
                     recovery=recovery,
                 )
             db.commit(conn)
             checksum_errors = 0
             timeout_reads = 0
+            transport_errors = 0
             next_write += 60
 
 

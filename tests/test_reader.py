@@ -63,6 +63,7 @@ class ReaderRecoveryTests(unittest.TestCase):
         self.assertEqual(status["consecutive_failures"], 0)
         self.assertEqual(status["valid_frames_total"], 5)
         self.assertEqual(status["checksum_errors_total"], 3)
+        self.assertEqual(status["transport_errors_total"], 0)
         self.assertEqual(status["sensor_resets_total"], 1)
         self.assertEqual(status["sht31_failures_total"], 1)
         conn.close()

@@ -46,6 +46,19 @@ class AlertTests(unittest.TestCase):
         self.assertEqual(events[0]["sensor_id"], "porch")
         self.assertTrue(events[0]["active"])
 
+    def test_missing_first_reading_triggers_stale_sensor_alert(self) -> None:
+        conn = db.connect(self.db_path)
+        conn.execute("DELETE FROM readings_raw")
+        conn.execute("DELETE FROM alert_state")
+        conn.commit()
+        conn.close()
+        events: list[dict] = []
+
+        self.assertTrue(run_once(self.cfg, now=1000, sender=events.append))
+
+        self.assertEqual([event["event"] for event in events], ["sensor_stale"])
+        self.assertTrue(events[0]["active"])
+
 
 if __name__ == "__main__":
     unittest.main()
