@@ -1,0 +1,14 @@
+{
+  "name": "PM2.5 Air Quality Monitor",
+  "short_name": "PM2.5",
+  "description": "Outdoor PM2.5 / PM10 air quality dashboard",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

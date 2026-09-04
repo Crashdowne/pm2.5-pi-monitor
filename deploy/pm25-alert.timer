@@ -1,0 +1,11 @@
+[Unit]
+Description=Evaluate PM2.5 alerts periodically
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=2min
+AccuracySec=15s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

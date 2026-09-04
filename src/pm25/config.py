@@ -1,0 +1,154 @@
+"""Typed configuration loaded from a TOML file (stdlib ``tomllib``, Python 3.11+)."""
+from __future__ import annotations
+
+import tomllib
+from dataclasses import dataclass, field
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class SHT31Config:
+    enabled: bool = False
+    address: int = 0x44
+
+
+@dataclass(frozen=True)
+class SensorConfig:
+    device: str = "/dev/ttyAMA0"
+    baud: int = 9600
+    mode: str = "duty_cycle"  # "duty_cycle" | "continuous"
+    period_s: int = 120
+    warmup_s: int = 30
+    sample_s: int = 8
+    reset_after_failures: int = 3
+    reopen_after_failures: int = 6
+    use_atmospheric: bool = True
+    pin_enable: int | None = 22
+    pin_reset: int | None = 27
+    sht31: SHT31Config = field(default_factory=SHT31Config)
+
+
+@dataclass(frozen=True)
+class StorageConfig:
+    db_path: str = "/var/lib/pm25/pm25.db"
+    raw_retention_days: int = 30
+
+
+@dataclass(frozen=True)
+class WebConfig:
+    host: str = "0.0.0.0"
+    port: int = 8080
+
+
+@dataclass(frozen=True)
+class SyncConfig:
+    enabled: bool = False
+    server_url: str = ""
+    token_env: str = "PM25_SYNC_TOKEN"
+    sensor_id: str = "default"
+    batch_size: int = 500
+    pressure_keep_days: int = 7
+    trigger_db_size_mb: int = 200
+    trigger_disk_free_mb: int = 200
+    retry_total: int = 3
+    gzip_enabled: bool = False
+
+
+@dataclass(frozen=True)
+class AlertConfig:
+    enabled: bool = False
+    webhook_url: str = ""
+    token_env: str = ""
+    threshold_aqi: int = 101
+    recovery_aqi: int = 80
+    consecutive_runs: int = 2
+    cooldown_s: int = 3600
+    stale_after_s: int = 600
+    sync_lag_s: int = 28800
+    disk_free_mb: int = 150
+    request_timeout_s: int = 10
+
+
+@dataclass(frozen=True)
+class Config:
+    sensor: SensorConfig
+    storage: StorageConfig
+    web: WebConfig
+    sync: SyncConfig
+    alerts: AlertConfig = field(default_factory=AlertConfig)
+
+
+def _pin(value: object) -> int | None:
+    """TOML has no null, so a negative pin number means 'not wired'."""
+    if value is None:
+        return None
+    n = int(value)  # type: ignore[arg-type]
+    return None if n < 0 else n
+
+
+def load_config(path: str | Path) -> Config:
+    data: dict = {}
+    p = Path(path)
+    if p.exists():
+        with open(p, "rb") as f:
+            data = tomllib.load(f)
+
+    s = data.get("sensor", {})
+    h = s.get("sht31", {})
+    sensor = SensorConfig(
+        device=s.get("device", "/dev/ttyAMA0"),
+        baud=int(s.get("baud", 9600)),
+        mode=s.get("mode", "duty_cycle"),
+        period_s=int(s.get("period_s", 120)),
+        warmup_s=int(s.get("warmup_s", 30)),
+        sample_s=int(s.get("sample_s", 8)),
+        reset_after_failures=int(s.get("reset_after_failures", 3)),
+        reopen_after_failures=int(s.get("reopen_after_failures", 6)),
+        use_atmospheric=bool(s.get("use_atmospheric", True)),
+        pin_enable=_pin(s.get("pin_enable", 22)),
+        pin_reset=_pin(s.get("pin_reset", 27)),
+        sht31=SHT31Config(
+            enabled=bool(h.get("enabled", False)),
+            address=int(h.get("address", 0x44)),
+        ),
+    )
+
+    st = data.get("storage", {})
+    storage = StorageConfig(
+        db_path=st.get("db_path", "/var/lib/pm25/pm25.db"),
+        raw_retention_days=int(st.get("raw_retention_days", 30)),
+    )
+
+    w = data.get("web", {})
+    web = WebConfig(host=w.get("host", "0.0.0.0"), port=int(w.get("port", 8080)))
+
+    y = data.get("sync", {})
+    sync = SyncConfig(
+        enabled=bool(y.get("enabled", False)),
+        server_url=y.get("server_url", ""),
+        token_env=y.get("token_env", "PM25_SYNC_TOKEN"),
+        sensor_id=str(y.get("sensor_id", "default")),
+        batch_size=int(y.get("batch_size", 500)),
+        pressure_keep_days=int(y.get("pressure_keep_days", 7)),
+        trigger_db_size_mb=int(y.get("trigger_db_size_mb", 200)),
+        trigger_disk_free_mb=int(y.get("trigger_disk_free_mb", 200)),
+        retry_total=int(y.get("retry_total", 3)),
+        gzip_enabled=bool(y.get("gzip_enabled", False)),
+    )
+
+    a = data.get("alerts", {})
+    alerts = AlertConfig(
+        enabled=bool(a.get("enabled", False)),
+        webhook_url=str(a.get("webhook_url", "")),
+        token_env=str(a.get("token_env", "")),
+        threshold_aqi=int(a.get("threshold_aqi", 101)),
+        recovery_aqi=int(a.get("recovery_aqi", 80)),
+        consecutive_runs=int(a.get("consecutive_runs", 2)),
+        cooldown_s=int(a.get("cooldown_s", 3600)),
+        stale_after_s=int(a.get("stale_after_s", 600)),
+        sync_lag_s=int(a.get("sync_lag_s", 28800)),
+        disk_free_mb=int(a.get("disk_free_mb", 150)),
+        request_timeout_s=int(a.get("request_timeout_s", 10)),
+    )
+
+    return Config(sensor=sensor, storage=storage, web=web, sync=sync, alerts=alerts)

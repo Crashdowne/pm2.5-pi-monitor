@@ -1,0 +1,24 @@
+[Unit]
+Description=PM2.5 sensor reader (PMS5003 -> SQLite)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pm25-reader
+Group=pm25-data
+SupplementaryGroups={{HARDWARE_GROUPS}}
+UMask=0007
+WorkingDirectory={{REPO}}
+ExecStart={{PYTHON}} -m pm25.reader --config /etc/pm25/config.toml
+Restart=always
+RestartSec=5
+Nice=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/pm25
+
+[Install]
+WantedBy=multi-user.target

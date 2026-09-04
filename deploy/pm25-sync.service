@@ -1,0 +1,21 @@
+[Unit]
+Description=PM2.5 offload + prune (Tailscale)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pm25-sync
+Group=pm25-data
+SupplementaryGroups=pm25-secrets
+UMask=0007
+WorkingDirectory={{REPO}}
+EnvironmentFile=-/etc/pm25/sync.env
+ExecStart={{PYTHON}} -m pm25.sync --config /etc/pm25/config.toml
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/pm25

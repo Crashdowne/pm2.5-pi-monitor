@@ -1,0 +1,21 @@
+[Unit]
+Description=Evaluate PM2.5 and monitor health alerts
+After=network-online.target pm25-reader.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pm25-alert
+Group=pm25-data
+SupplementaryGroups=pm25-secrets
+UMask=0007
+WorkingDirectory={{REPO}}
+EnvironmentFile=-/etc/pm25/sync.env
+ExecStart={{PYTHON}} -m pm25.alerts --config /etc/pm25/config.toml
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/pm25

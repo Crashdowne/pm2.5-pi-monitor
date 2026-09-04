@@ -1,0 +1,52 @@
+# PM2.5 / PM10 monitor - configuration
+# Copy to /etc/pm25/config.toml on the Pi and adjust as needed.
+
+[sensor]
+device = "/dev/ttyAMA0"     # PL011 UART (available after disabling Bluetooth, see README)
+baud = 9600
+mode = "duty_cycle"         # "duty_cycle" (default) | "continuous"
+period_s = 120              # duty_cycle: seconds between samples (~30 samples/hour)
+warmup_s = 30               # fan stabilization time after wake (duty_cycle)
+sample_s = 8                # averaging burst length while awake
+reset_after_failures = 3    # hardware reset after this many empty sampling cycles
+reopen_after_failures = 6   # reopen UART after this many empty sampling cycles
+use_atmospheric = true      # use the atmospheric/environmental PM values (recommended outdoors)
+pin_enable = 22             # BCM pin -> PMS5003 SET (sleep/wake). Set to -1 to disable
+pin_reset = 27              # BCM pin -> PMS5003 RESET. Set to -1 to disable
+
+[sensor.sht31]
+enabled = true              # set to false if the humidity sensor is not wired
+address = 0x44              # SHT31-D default (0x44; use 0x45 if the ADDR pin is high)
+
+[storage]
+db_path = "/var/lib/pm25/pm25.db"
+raw_retention_days = 30     # raw rows kept on the Pi; hourly/daily rollups are kept indefinitely
+
+[web]
+host = "0.0.0.0"            # reachable over LAN + tailnet; do NOT expose publicly
+port = 8080
+
+[sync]
+enabled = false             # turn on once the server is reachable over Tailscale
+server_url = ""             # e.g. "http://pm25-server.tailXXXX.ts.net:9000"
+token_env = "PM25_SYNC_TOKEN"   # env var holding the bearer token (kept out of this file)
+sensor_id = "default"       # unique stable ID when syncing more than one monitor
+batch_size = 500
+pressure_keep_days = 7      # prune raw down to this when under storage pressure
+trigger_db_size_mb = 200    # storage-pressure trigger: DB larger than this
+trigger_disk_free_mb = 200  # storage-pressure trigger: free disk below this
+retry_total = 3             # bounded retries for idempotent ingest/max-ts requests
+gzip_enabled = false        # useful for slow links; off by default to minimize Pi CPU
+
+[alerts]
+enabled = false             # one-shot webhook checks run from pm25-alert.timer
+webhook_url = ""            # generic HTTP endpoint that accepts a JSON POST
+token_env = ""              # optional env var sent as a Bearer token
+threshold_aqi = 101         # alert after consecutive NowCast readings at/above this AQI
+recovery_aqi = 80           # clear AQI alert only after falling to/below this value
+consecutive_runs = 2
+cooldown_s = 3600           # repeat an unresolved alert no more than once per hour
+stale_after_s = 600
+sync_lag_s = 28800
+disk_free_mb = 150
+request_timeout_s = 10
