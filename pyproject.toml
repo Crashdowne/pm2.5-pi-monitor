@@ -23,6 +23,7 @@ pm25-reader = "pm25.reader:main"
 pm25-web = "pm25.web:main"
 pm25-sync = "pm25.sync:main"
 pm25-alert = "pm25.alerts:main"
+pm25-setup = "pm25.setup:main"
 
 [build-system]
 requires = ["hatchling"]

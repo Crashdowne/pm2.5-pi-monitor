@@ -7,7 +7,7 @@
 set -eu
 
 # --- EDIT THESE ---
-REPO_URL="https://github.com/OWNER/pm2.5-pi-monitor.git"   # your fork/clone URL
+REPO_URL="https://github.com/crashdowne/pm2.5-pi-monitor.git"   # your fork/clone URL
 REF=""                                                     # optional: pin a tag/commit (e.g. v0.2.0) for a reproducible install
 TARGET="/opt/pm25"
 

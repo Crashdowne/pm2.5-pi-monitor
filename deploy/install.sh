@@ -125,6 +125,7 @@ cat <<EOF
 
 Installed. Next steps:
   1. sudo reboot            # apply the UART / Bluetooth change
-  2. sudo tailscale up      # join your tailnet (opens a login link)
-  3. open http://<pi-ip>:8080
+  2. sudo $REPO/.venv/bin/pm25-setup   # guided sensor configuration + live test
+  3. sudo tailscale up      # join your tailnet (opens a login link)
+  4. open http://<pi-ip>:8080
 EOF

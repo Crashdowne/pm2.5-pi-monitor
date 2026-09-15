@@ -64,6 +64,17 @@ first run. The dashboard is then at `http://<pi-lan-or-tailscale-ip>:8080`. Inst
 creates the complete SQLite schema, including SHT31 temperature and humidity rollups, before
 starting the services.
 
+### Interactive sensor setup
+
+Instead of hand-editing `config.toml`, run the guided wizard on the Pi (after the reboot, so
+the UART and I2C bus are live). It walks through the PMS5003 and SHT31 options and GPIO pin
+selection, live-tests each sensor, writes the config, restarts the reader, and confirms a
+fresh reading:
+
+```bash
+sudo /opt/pm25/.venv/bin/pm25-setup
+```
+
 ### Services
 
 | Unit | Role |
