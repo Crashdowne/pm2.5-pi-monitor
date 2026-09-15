@@ -1,0 +1,44 @@
+# aqi-worker — Cloudflare Worker (ingest + read API + static SPA + alerts cron).
+# database_id is a placeholder for local dev; replace after `wrangler d1 create aqi`.
+name = "aqi-worker"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "aqi"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+# Alerts poller. Cron cadence mirrors aqi-site poll_interval_s (5 min). Alerts only
+# fire when ALERTS_ENABLED=true and ntfy/webhook are configured.
+[triggers]
+crons = ["*/5 * * * *"]
+
+[observability]
+enabled = true
+
+# Static SPA assets — the built React dashboard in web/dist, served same-origin with
+# /api. Static-asset requests are free and do not count against the Workers request cap.
+# Client-side routes fall back to index.html; /api/*, /ingest, /max_ts hit the Worker.
+[assets]
+directory = "web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Non-secret configuration. Secrets (INGEST_TOKEN, NTFY_TOKEN) are set with
+# `wrangler secret put <NAME>` and, for local dev, in .dev.vars.
+[vars]
+SITE_TITLE = "Air Quality"
+TEMP_UNIT = "c"
+TZ_OFFSET_HOURS = "0"
+DEFAULT_SENSOR = ""
+MASK_SENSITIVITY = "asthma"
+ALERTS_ENABLED = "false"
+ALERTS_NOTIFY_FROM = "recommended"
+ALERTS_MIN_INTERVAL_S = "3600"
+ALERTS_QUIET_START_HOUR = "-1"
+ALERTS_QUIET_END_HOUR = "-1"
+NTFY_URL = ""
+NTFY_TOPIC = ""
+WEBHOOK_URL = ""

@@ -1,0 +1,14 @@
+[Unit]
+Description=Disable Wi-Fi power save (keep the headless dashboard reachable)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# brcmfmac (Pi Zero 2 W) parks the radio under power save, which stalls LAN/tailnet
+# access to the dashboard. Turn it off for any wireless interface that is present.
+ExecStart=/bin/sh -c 'for d in /sys/class/net/wl*; do [ -e "$d" ] || continue; n=$(basename "$d"); command -v iw >/dev/null 2>&1 && iw dev "$n" set power_save off || true; done'
+
+[Install]
+WantedBy=multi-user.target

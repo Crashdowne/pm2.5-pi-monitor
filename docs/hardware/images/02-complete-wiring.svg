@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1340" viewBox="0 0 1600 1340" role="img" aria-labelledby="title description">
+  <title id="title">Complete Pi Zero 2 W, PMS5003 and GY-SHT31 wiring schematic</title>
+  <desc id="description">PMS VCC contact 1 to Pi physical 2, GND 2 to Pi 6, TX 5 to Pi 10, SET 3 to Pi 15, RESET 6 to Pi 13, optional RX 4 to Pi 8. SHT VCC to Pi 1, GND to Pi 9, SDA to Pi 3, SCL to Pi 5. Pi powered through micro-USB PWR IN only. Native PMS contacts 7 and 8 unused.</desc>
+  <rect width="1600" height="1340" fill="#ffffff"/>
+  <g font-family="DejaVu Sans, sans-serif" fill="#22282b">
+    <text x="60" y="64" font-size="36" font-weight="bold">02 / Complete wiring schematic</text>
+    <text x="60" y="105" font-size="22">Nine required jumper connections. W6 is optional. Unplug all power before assembly.</text>
+    <rect x="60" y="130" width="1480" height="70" rx="5" fill="#edf5f0"/>
+    <text x="84" y="160" font-size="21" font-weight="bold">POWER SOURCE: regulated 5.1 V / 2.5 A micro-USB Pi supply</text>
+    <text x="84" y="186" font-size="19">Plug into Pi PWR IN only. Sensors get their power from the Pi; no second supply.</text>
+    <path d="M310 201 V230" stroke="#168252" stroke-width="4"/><path d="M310 240 L302 223 H318 Z" fill="#168252"/>
+    <rect x="60" y="240" width="500" height="980" rx="7" fill="#f1f6f3" stroke="#719681" stroke-width="2"/>
+    <text x="85" y="278" font-size="27" font-weight="bold">Raspberry Pi Zero 2 W</text>
+    <text x="85" y="306" font-size="18">Physical pin number / Pi signal</text>
+    <rect x="1100" y="240" width="440" height="570" rx="7" fill="#f4f6f7" stroke="#a6b3ba" stroke-width="2"/>
+    <text x="1130" y="278" font-size="27" font-weight="bold">PMS5003 + adapter</text>
+    <text x="1130" y="306" font-size="18">Native sensor contact / label</text>
+    <rect x="1100" y="875" width="440" height="345" rx="7" fill="#f2f6fa" stroke="#91adc2" stroke-width="2"/>
+    <text x="1130" y="913" font-size="27" font-weight="bold">GY-SHT31 breakout</text>
+    <text x="1130" y="941" font-size="18">Find these labels on your board</text>
+    <g font-size="25">
+      <text x="85" y="371">Pin 2 / 5 V</text><text x="85" y="443">Pin 6 / GND</text>
+      <text x="85" y="515">Pin 10 / GPIO15 RXD</text><text x="85" y="587">Pin 15 / GPIO22</text>
+      <text x="85" y="659">Pin 13 / GPIO27</text><text x="85" y="731">Pin 8 / GPIO14 TXD</text>
+      <text x="1130" y="371">1 / VCC (5V)</text><text x="1130" y="443">2 / GND</text>
+      <text x="1130" y="515">5 / TX (TXD)</text><text x="1130" y="587">3 / SET</text>
+      <text x="1130" y="659">6 / RESET (RST)</text><text x="1130" y="731">4 / RX (RXD)</text>
+      <text x="85" y="998">Pin 1 / 3.3 V</text><text x="85" y="1063">Pin 9 / GND</text>
+      <text x="85" y="1128">Pin 3 / GPIO2 SDA1</text><text x="85" y="1193">Pin 5 / GPIO3 SCL1</text>
+      <text x="1130" y="998">VCC / VIN (3.3V)</text><text x="1130" y="1063">GND</text>
+      <text x="1130" y="1128">SDA</text><text x="1130" y="1193">SCL</text>
+    </g>
+    <g id="wire-W1" data-pi-pin="2" data-sensor="PMS5003" data-contact="1" data-signal="VCC">
+      <path d="M560 362 H1100" stroke="#c33e32" stroke-width="7"/><circle cx="560" cy="362" r="8" fill="#c33e32"/><circle cx="1100" cy="362" r="8" fill="#c33e32"/>
+      <text x="596" y="347" font-size="21" fill="#a62d25">W1  RED / 5 V power</text>
+    </g>
+    <g id="wire-W2" data-pi-pin="6" data-sensor="PMS5003" data-contact="2" data-signal="GND">
+      <path d="M560 434 H1100" stroke="#24282d" stroke-width="7"/><circle cx="560" cy="434" r="8" fill="#24282d"/><circle cx="1100" cy="434" r="8" fill="#24282d"/>
+      <text x="596" y="419" font-size="21">W2  BLACK / ground</text>
+    </g>
+    <g id="wire-W3" data-pi-pin="10" data-sensor="PMS5003" data-contact="5" data-signal="TX">
+      <path d="M560 506 H1100" stroke="#1874c6" stroke-width="7"/><circle cx="560" cy="506" r="8" fill="#1874c6"/><circle cx="1100" cy="506" r="8" fill="#1874c6"/>
+      <path d="M590 506 L608 495 V517 Z" fill="#1874c6"/>
+      <text x="596" y="491" font-size="21" fill="#1767ac">W3  BLUE / sensor TX to Pi RX</text>
+    </g>
+    <g id="wire-W4" data-pi-pin="15" data-sensor="PMS5003" data-contact="3" data-signal="SET">
+      <path d="M560 578 H1100" stroke="#168252" stroke-width="7"/><circle cx="560" cy="578" r="8" fill="#168252"/><circle cx="1100" cy="578" r="8" fill="#168252"/>
+      <path d="M1070 578 L1052 567 V589 Z" fill="#168252"/>
+      <text x="596" y="563" font-size="21" fill="#11613d">W4  GREEN / sleep-wake control</text>
+    </g>
+    <g id="wire-W5" data-pi-pin="13" data-sensor="PMS5003" data-contact="6" data-signal="RESET">
+      <path d="M560 650 H1100" stroke="#6c747c" stroke-width="7"/><circle cx="560" cy="650" r="8" fill="#6c747c"/><circle cx="1100" cy="650" r="8" fill="#6c747c"/>
+      <path d="M1070 650 L1052 639 V661 Z" fill="#6c747c"/>
+      <text x="596" y="635" font-size="21" fill="#50585f">W5  GRAY / reset control</text>
+    </g>
+    <g id="wire-W6" data-pi-pin="8" data-sensor="PMS5003" data-contact="4" data-signal="RX" data-optional="true">
+      <path d="M560 722 H1100" stroke="#626e77" stroke-width="9" stroke-dasharray="17 11"/>
+      <path d="M560 722 H1100" stroke="#ffffff" stroke-width="4" stroke-dasharray="17 11"/>
+      <circle cx="560" cy="722" r="8" fill="#ffffff" stroke="#626e77" stroke-width="3"/><circle cx="1100" cy="722" r="8" fill="#ffffff" stroke="#626e77" stroke-width="3"/>
+      <path d="M1070 722 L1052 711 V733 Z" fill="#626e77"/>
+      <text x="596" y="707" font-size="21">W6  WHITE / OPTIONAL Pi TX to RX</text>
+    </g>
+    <text x="1130" y="786" font-size="20" font-weight="bold">Native contacts 7 and 8: NC.</text>
+    <text x="596" y="792" font-size="19">Solid wires: fit all nine.</text>
+    <text x="596" y="819" font-size="19">Dashed W6: may be left out.</text>
+    <path d="M85 851 H532" stroke="#b6c8bd" stroke-width="2"/>
+    <text x="85" y="887" font-size="21" font-weight="bold">Two voltages, one common ground</text>
+    <text x="85" y="918" font-size="18">Pi pins 6 and 9 share ground internally.</text>
+    <text x="85" y="944" font-size="18">Never join the 5 V and 3.3 V supplies.</text>
+    <g id="wire-W7" data-pi-pin="1" data-sensor="GY-SHT31" data-signal="VCC">
+      <path d="M560 989 H1100" stroke="#c66218" stroke-width="7"/><circle cx="560" cy="989" r="8" fill="#c66218"/><circle cx="1100" cy="989" r="8" fill="#c66218"/>
+      <text x="596" y="974" font-size="21" fill="#a94f10">W7  ORANGE / 3.3 V power</text>
+    </g>
+    <g id="wire-W8" data-pi-pin="9" data-sensor="GY-SHT31" data-signal="GND">
+      <path d="M560 1054 H1100" stroke="#24282d" stroke-width="7"/><circle cx="560" cy="1054" r="8" fill="#24282d"/><circle cx="1100" cy="1054" r="8" fill="#24282d"/>
+      <text x="596" y="1039" font-size="21">W8  BLACK / ground</text>
+    </g>
+    <g id="wire-W9" data-pi-pin="3" data-sensor="GY-SHT31" data-signal="SDA">
+      <path d="M560 1119 H1100" stroke="#b18a00" stroke-width="7"/><circle cx="560" cy="1119" r="8" fill="#b18a00"/><circle cx="1100" cy="1119" r="8" fill="#b18a00"/>
+      <text x="596" y="1104" font-size="21" fill="#886800">W9  YELLOW / I2C data</text>
+    </g>
+    <g id="wire-W10" data-pi-pin="5" data-sensor="GY-SHT31" data-signal="SCL">
+      <path d="M560 1184 H1100" stroke="#7d55b5" stroke-width="7"/><circle cx="560" cy="1184" r="8" fill="#7d55b5"/><circle cx="1100" cy="1184" r="8" fill="#7d55b5"/>
+      <text x="596" y="1169" font-size="21" fill="#684398">W10  PURPLE / I2C clock</text>
+    </g>
+    <text x="60" y="1264" font-size="21" font-weight="bold">Electrical connections, not physical pad order. Use Figure 01 to locate Pi pins; read sensor labels.</text>
+    <text x="60" y="1296" font-size="19">Colors are suggestions, not factory cable colors. All GPIO signals are 3.3 V. Use a 3.3 V-compatible GY-SHT31.</text>
+  </g>
+</svg>

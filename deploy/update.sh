@@ -35,9 +35,17 @@ chmod 640 /etc/pm25/config.toml /etc/pm25/sync.env
 for u in pm25-reader.service pm25-web.service pm25-sync.service pm25-sync.timer pm25-alert.service pm25-alert.timer; do
 	sed -e "s#{{REPO}}#$REPO#g" -e "s#{{PYTHON}}#$PYTHON#g" -e "s#{{HARDWARE_GROUPS}}#$HARDWARE_GROUPS#g" "$REPO/deploy/$u" > "/etc/systemd/system/$u"
 done
+install -m 644 "$REPO/deploy/pm25-wifi-powersave.service" /etc/systemd/system/pm25-wifi-powersave.service
+install -d /etc/systemd/journald.conf.d
+install -m 644 "$REPO/deploy/journald-pm25.conf" /etc/systemd/journald.conf.d/pm25.conf
+systemctl restart systemd-journald 2>/dev/null || true
+if systemctl list-unit-files tailscaled.service >/dev/null 2>&1; then
+	install -d /etc/systemd/system/tailscaled.service.d
+	install -m 644 "$REPO/deploy/tailscaled-memory.conf" /etc/systemd/system/tailscaled.service.d/memory.conf
+fi
 systemctl daemon-reload
-systemctl enable pm25-sync.timer
-systemctl restart pm25-reader.service pm25-web.service pm25-sync.timer
+systemctl enable pm25-sync.timer pm25-wifi-powersave.service
+systemctl restart pm25-reader.service pm25-web.service pm25-sync.timer pm25-wifi-powersave.service
 if "$PYTHON" -c 'from pm25.config import load_config; raise SystemExit(not load_config("/etc/pm25/config.toml").alerts.enabled)'; then
 	systemctl enable pm25-alert.timer
 	systemctl restart pm25-alert.timer

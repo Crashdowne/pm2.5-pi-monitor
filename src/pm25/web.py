@@ -18,7 +18,7 @@ def main() -> None:
     cfg = load_config(args.config)
     app = create_app(cfg)
     logging.info("serving on %s:%d", cfg.web.host, cfg.web.port)
-    serve(app, host=cfg.web.host, port=cfg.web.port, threads=4)
+    serve(app, host=cfg.web.host, port=cfg.web.port, threads=2)  # 512 MB RAM budget on the Pi Zero 2 W
 
 
 if __name__ == "__main__":

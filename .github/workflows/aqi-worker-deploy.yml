@@ -1,0 +1,32 @@
+name: aqi-worker deploy
+
+# Manual deploy of the aqi-worker to Cloudflare. Before the first run:
+#   1. Create the D1 database:  npx wrangler d1 create aqi  (paste its id into aqi-worker/wrangler.toml)
+#   2. Apply the schema:        npx wrangler d1 migrations apply aqi --remote
+#   3. Set the ingest secret:   npx wrangler secret put INGEST_TOKEN
+#   4. Add the CLOUDFLARE_API_TOKEN repo secret (Workers + D1 edit permissions).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm install
+        working-directory: aqi-worker
+      - run: npm install
+        working-directory: aqi-worker/web
+      - run: npm run build
+        working-directory: aqi-worker/web
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: aqi-worker

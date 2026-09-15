@@ -40,15 +40,30 @@ def _session(cfg: Config) -> requests.Session:
     return session
 
 
-def _push(cfg: Config, conn, session: requests.Session) -> None:
+def _auth_headers(cfg: Config) -> dict:
+    """Bearer token and/or Cloudflare Access service-token headers, whichever are set."""
+    headers: dict = {}
     token = os.environ.get(cfg.sync.token_env, "")
-    if not token:
-        raise RuntimeError(f"no sync token in env {cfg.sync.token_env}")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if cfg.sync.access_client_id_env and cfg.sync.access_client_secret_env:
+        client_id = os.environ.get(cfg.sync.access_client_id_env, "")
+        client_secret = os.environ.get(cfg.sync.access_client_secret_env, "")
+        if client_id and client_secret:
+            headers["CF-Access-Client-Id"] = client_id
+            headers["CF-Access-Client-Secret"] = client_secret
+    return headers
+
+
+def _push(cfg: Config, conn, session: requests.Session) -> None:
+    auth = _auth_headers(cfg)
+    if not auth:
+        raise RuntimeError(f"no sync credentials: set {cfg.sync.token_env} or CF Access service token")
     headers = {
-        "Authorization": f"Bearer {token}",
         "Content-Type": "application/x-ndjson",
         "X-PM25-Sensor-ID": cfg.sync.sensor_id,
         "X-PM25-Sample-Period": str(cfg.sensor.period_s if cfg.sensor.mode == "duty_cycle" else 60),
+        **auth,
     }
     url = cfg.sync.server_url.rstrip("/") + "/ingest"
     columns = ",".join(["ts", *db.RAW_COLS])
@@ -79,10 +94,9 @@ def _push(cfg: Config, conn, session: requests.Session) -> None:
 
 
 def _refresh_server_max(cfg: Config, conn, session: requests.Session) -> int:
-    token = os.environ.get(cfg.sync.token_env, "")
     resp = session.get(
         cfg.sync.server_url.rstrip("/") + "/max_ts",
-        headers={"Authorization": f"Bearer {token}", "X-PM25-Sensor-ID": cfg.sync.sensor_id},
+        headers={"X-PM25-Sensor-ID": cfg.sync.sensor_id, **_auth_headers(cfg)},
         timeout=15,
     )
     resp.raise_for_status()

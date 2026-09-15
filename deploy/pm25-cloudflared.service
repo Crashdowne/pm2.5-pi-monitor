@@ -1,0 +1,27 @@
+[Unit]
+Description=Cloudflare Tunnel for the PM2.5 dashboard (localhost:8080 only)
+Documentation=https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+EnvironmentFile=/etc/pm25/cloudflared.env
+# --no-autoupdate stops cloudflared rewriting its own binary (SD wear + surprise restarts).
+# Point the tunnel's public hostname at http://localhost:8080 in the Cloudflare dashboard,
+# and gate it with Cloudflare Access (the dashboard has no built-in auth).
+ExecStart=/usr/bin/cloudflared --no-autoupdate --loglevel warn tunnel run --token ${CF_TUNNEL_TOKEN}
+Restart=on-failure
+RestartSec=5
+Nice=10
+MemoryAccounting=yes
+MemoryHigh=96M
+MemoryMax=150M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

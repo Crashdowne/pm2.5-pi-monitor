@@ -1,0 +1,8 @@
+# Worker / tooling
+node_modules/
+.wrangler/
+.dev.vars
+dist/
+web/dist/
+*.log
+.DS_Store

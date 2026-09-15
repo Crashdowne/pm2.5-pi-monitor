@@ -29,9 +29,13 @@ port = 8080
 [sync]
 enabled = false             # turn on once the server is reachable over Tailscale
 server_url = ""             # e.g. "http://pm25-server.tailXXXX.ts.net:9000"
-token_env = "PM25_SYNC_TOKEN"   # env var holding the bearer token (kept out of this file)
+token_env = "PM25_SYNC_TOKEN"   # env var holding the bearer token; for aqi-worker set it to the Worker's INGEST_TOKEN
+# Optional Cloudflare Access service token, only if you put Access in front of the endpoint.
+# aqi-worker uses the bearer token above by default; leave these blank for that.
+access_client_id_env = ""       # env var holding the CF Access service-token client id
+access_client_secret_env = ""   # env var holding the CF Access service-token client secret
 sensor_id = "default"       # unique stable ID when syncing more than one monitor
-batch_size = 500
+batch_size = 200            # <= 329 for aqi-worker (free-tier D1 query cap; larger POSTs get HTTP 413)
 pressure_keep_days = 7      # prune raw down to this when under storage pressure
 trigger_db_size_mb = 200    # storage-pressure trigger: DB larger than this
 trigger_disk_free_mb = 200  # storage-pressure trigger: free disk below this

@@ -22,21 +22,23 @@ jobs:
       - run: node --check web/app.js && node --check web/charts.js && node --check web/sw.js && node --check server/fleet.js
       - run: bash -n deploy/install.sh deploy/update.sh
 
-  aqi-site:
+  aqi-worker:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-        with:
-          python-version: "3.11"
-          enable-cache: true
-      - run: uv sync
-      - run: uv run python -W error::ResourceWarning -m unittest discover -s aqi-site/tests -t aqi-site -v
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
-      - run: npm ci
-        working-directory: aqi-site/web
+          node-version: "24"
+      - run: npm install
+        working-directory: aqi-worker
+      - run: npm run typecheck
+        working-directory: aqi-worker
+      - run: npm test
+        working-directory: aqi-worker
+      - run: npm install
+        working-directory: aqi-worker/web
       - run: npm run build
-        working-directory: aqi-site/web
+        working-directory: aqi-worker/web
+      - run: npx wrangler deploy --dry-run --outdir /tmp/aqi-worker-out
+        working-directory: aqi-worker

@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1320" viewBox="0 0 1600 1320" role="img" aria-labelledby="title description">
+  <title id="title">PMS5003 cable and GY-SHT31 connection guide</title>
+  <desc id="description">The original eight-contact cable plugs into the PMS5003 and a labeled adapter. Use adapter labels rather than factory wire colors. The generic SHT31 board uses VCC, GND, SDA and SCL at 3.3 volts. Diagram terminal order is logical, not a verified physical layout for the user's boards.</desc>
+  <rect width="1600" height="1320" fill="#ffffff"/>
+  <g font-family="DejaVu Sans, sans-serif" fill="#22282b">
+    <text x="60" y="64" font-size="36" font-weight="bold">03 / Connect at the sensor end</text>
+    <rect x="60" y="100" width="1480" height="82" rx="5" fill="#fff2e8"/>
+    <text x="84" y="135" font-size="23" font-weight="bold">MATCH LABELS, NOT POSITIONS.</text>
+    <text x="84" y="164" font-size="20">These are connection illustrations. Your generic boards may have a different pad order or connector shape.</text>
+    <text x="60" y="230" font-size="28" font-weight="bold">PMS5003: keep the original cable intact</text>
+    <rect x="90" y="302" width="275" height="248" rx="8" fill="#ced4d7" stroke="#838f95" stroke-width="3"/>
+    <rect x="113" y="326" width="112" height="30" rx="3" fill="#252d31"/>
+    <rect x="113" y="371" width="112" height="30" rx="3" fill="#252d31"/>
+    <text x="111" y="459" font-size="30" font-weight="bold">PMS5003</text>
+    <text x="111" y="496" font-size="20">Grounded metal case</text>
+    <rect x="348" y="391" width="38" height="62" rx="3" fill="#f4f3eb" stroke="#899299" stroke-width="2"/>
+    <g stroke="#9ba6ac" stroke-width="3">
+      <path d="M386 398 H642"/><path d="M386 405 H642"/><path d="M386 412 H642"/><path d="M386 419 H642"/>
+      <path d="M386 426 H642"/><path d="M386 433 H642"/><path d="M386 440 H642"/><path d="M386 447 H642"/>
+    </g>
+    <text x="506" y="353" text-anchor="middle" font-size="22" font-weight="bold">Matching cable</text>
+    <text x="506" y="382" text-anchor="middle" font-size="19">8 contacts</text>
+    <text x="506" y="489" text-anchor="middle" font-size="18">Align keyed plugs.</text>
+    <text x="506" y="516" text-anchor="middle" font-size="18">Do not force.</text>
+    <rect x="644" y="270" width="896" height="429" rx="7" fill="#eef3f0" stroke="#82a28c" stroke-width="2"/>
+    <rect x="628" y="391" width="38" height="62" rx="3" fill="#f4f3eb" stroke="#899299" stroke-width="2"/>
+    <text x="676" y="308" font-size="22" font-weight="bold">LABELED ADAPTER</text>
+    <text x="1512" y="308" font-size="19" text-anchor="end">Destination: Pi physical pin</text>
+    <g font-size="23">
+      <text x="686" y="362">VCC / 5V</text><text x="686" y="420">GND</text><text x="686" y="478">TX / TXD</text>
+      <text x="686" y="536">SET</text><text x="686" y="594">RESET / RST</text><text x="686" y="652">RX / RXD</text>
+      <text x="1325" y="362">2 / 5 V</text><text x="1325" y="420">6 / GND</text><text x="1325" y="478">10 / RX</text>
+      <text x="1325" y="536">15 / GPIO22</text><text x="1325" y="594">13 / GPIO27</text><text x="1325" y="652">8 / TX</text>
+    </g>
+    <g stroke-width="6">
+      <path d="M940 354 H1298" stroke="#c33e32"/><path d="M940 412 H1298" stroke="#24282d"/>
+      <path d="M940 470 H1298" stroke="#1874c6"/><path d="M940 528 H1298" stroke="#168252"/>
+      <path d="M940 586 H1298" stroke="#6c747c"/>
+      <path d="M940 644 H1298" stroke="#626e77" stroke-width="8" stroke-dasharray="17 10"/>
+      <path d="M940 644 H1298" stroke="#ffffff" stroke-width="3" stroke-dasharray="17 10"/>
+    </g>
+    <g font-size="18" font-weight="bold" text-anchor="middle">
+      <text x="1118" y="343" fill="#a62d25">W1</text><text x="1118" y="401">W2</text><text x="1118" y="459" fill="#1767ac">W3</text>
+      <text x="1118" y="517" fill="#11613d">W4</text><text x="1118" y="575" fill="#50585f">W5</text><text x="1118" y="633">W6 OPTIONAL</text>
+    </g>
+    <text x="90" y="603" font-size="20">Do not block either air opening.</text>
+    <text x="90" y="632" font-size="20">Keep the metal case off Pi pins.</text>
+    <text x="60" y="748" font-size="21" font-weight="bold">Native PMS contacts: 1 VCC, 2 GND, 3 SET, 4 RX, 5 TX, 6 RESET. Leave 7 and 8 unconnected.</text>
+    <text x="60" y="781" font-size="19">Native contact numbers do not necessarily match adapter header order. Factory cable colors are not standardized.</text>
+    <path d="M60 813 H1540" stroke="#cdd5d8" stroke-width="2"/>
+    <text x="60" y="862" font-size="28" font-weight="bold">GY-SHT31: four connections, powered from 3.3 V</text>
+    <rect x="90" y="932" width="380" height="230" rx="7" fill="#246683" stroke="#17465a" stroke-width="3"/>
+    <circle cx="117" cy="959" r="12" fill="#e5d79f"/><circle cx="443" cy="1135" r="12" fill="#e5d79f"/>
+    <rect x="224" y="962" width="91" height="78" rx="3" fill="#d6d7d2" stroke="#f0eee1" stroke-width="3"/>
+    <rect x="243" y="980" width="53" height="38" rx="2" fill="#252c2f"/>
+    <text x="121" y="1090" fill="#ffffff" font-size="28" font-weight="bold">GY-SHT31</text>
+    <text x="121" y="1125" fill="#e6eff3" font-size="19">Illustration, not your pad layout</text>
+    <text x="60" y="1211" font-size="20">Do not cover the sensing opening.</text>
+    <text x="60" y="1240" font-size="20">Mount away from the Pi's heat.</text>
+    <g font-size="24">
+      <text x="635" y="966">VCC / VIN</text><text x="635" y="1030">GND</text><text x="635" y="1094">SDA</text><text x="635" y="1158">SCL</text>
+      <text x="1270" y="966">Pin 1 / 3.3 V</text><text x="1270" y="1030">Pin 9 / GND</text>
+      <text x="1270" y="1094">Pin 3 / SDA</text><text x="1270" y="1158">Pin 5 / SCL</text>
+    </g>
+    <g stroke-width="6">
+      <path d="M840 958 H1245" stroke="#c66218"/><path d="M840 1022 H1245" stroke="#24282d"/>
+      <path d="M840 1086 H1245" stroke="#b18a00"/><path d="M840 1150 H1245" stroke="#7d55b5"/>
+    </g>
+    <g font-size="18" font-weight="bold" text-anchor="middle">
+      <text x="1043" y="946" fill="#a94f10">W7 ORANGE</text><text x="1043" y="1010">W8 BLACK</text>
+      <text x="1043" y="1074" fill="#886800">W9 YELLOW</text><text x="1043" y="1138" fill="#684398">W10 PURPLE</text>
+    </g>
+    <text x="635" y="1211" font-size="20">Leave the address jumper at factory default 0x44.</text>
+    <text x="635" y="1240" font-size="20">Confirm 3.3 V input support before powering a generic board.</text>
+    <text x="60" y="1290" font-size="20" font-weight="bold">Bare board holes are not jumper sockets. Solder headers first; never rely on a loose pin in a hole.</text>
+  </g>
+</svg>

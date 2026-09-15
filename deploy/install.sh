@@ -7,6 +7,26 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "Repo: $REPO"
 
+# --- base OS packages (DietPi minimal ships without git; iw disables Wi-Fi power save) ---
+if command -v apt-get >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y || echo "warning: apt-get update failed; continuing with installed packages"
+  apt-get install -y --no-install-recommends git ca-certificates curl iw ||
+    echo "warning: could not install one or more base packages"
+fi
+
+# --- preflight: warn if a dependency would fall back to a slow on-device source build ---
+ARCH="$(uname -m)"
+if [[ "$ARCH" != "aarch64" && "$ARCH" != "armv7l" ]]; then
+  echo "warning: unexpected architecture '$ARCH' (expected aarch64 on a 64-bit DietPi image)"
+fi
+if [[ "$ARCH" == "aarch64" ]] && command -v dpkg >/dev/null 2>&1; then
+  GLIBC_VER="$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}')"
+  if [[ -n "$GLIBC_VER" ]] && dpkg --compare-versions "$GLIBC_VER" lt 2.34; then
+    echo "warning: glibc $GLIBC_VER < 2.34 - lgpio may build from source; prefer a Trixie/Bookworm arm64 image"
+  fi
+fi
+
 # --- least-privilege service accounts, directories, config, secrets ---
 getent group pm25-data >/dev/null || groupadd --system pm25-data
 getent group pm25-secrets >/dev/null || groupadd --system pm25-secrets
@@ -73,18 +93,38 @@ grep -q '^i2c-dev' /etc/modules 2>/dev/null || echo 'i2c-dev' >> /etc/modules
 for u in pm25-reader.service pm25-web.service pm25-sync.service pm25-sync.timer pm25-alert.service pm25-alert.timer; do
   sed -e "s#{{REPO}}#$REPO#g" -e "s#{{PYTHON}}#$PYTHON#g" -e "s#{{HARDWARE_GROUPS}}#$HARDWARE_GROUPS#g" "$REPO/deploy/$u" > "/etc/systemd/system/$u"
 done
+install -m 644 "$REPO/deploy/pm25-wifi-powersave.service" /etc/systemd/system/pm25-wifi-powersave.service
 systemctl daemon-reload
-systemctl enable --now pm25-reader.service pm25-web.service pm25-sync.timer
+systemctl enable --now pm25-reader.service pm25-web.service pm25-sync.timer pm25-wifi-powersave.service
 if "$PYTHON" -c 'from pm25.config import load_config; raise SystemExit(not load_config("/etc/pm25/config.toml").alerts.enabled)'; then
   systemctl enable --now pm25-alert.timer
 else
   systemctl disable --now pm25-alert.timer
 fi
 
+# --- spare the SD card: keep the systemd journal in RAM (database writes still go to disk) ---
+install -d /etc/systemd/journald.conf.d
+install -m 644 "$REPO/deploy/journald-pm25.conf" /etc/systemd/journald.conf.d/pm25.conf
+systemctl restart systemd-journald 2>/dev/null || true
+
+# --- Tailscale: install the client + service (join the tailnet later with `tailscale up`) ---
+if ! command -v tailscale >/dev/null 2>&1; then
+  echo "Installing Tailscale..."
+  curl -fsSL https://tailscale.com/install.sh | sh
+fi
+systemctl enable --now tailscaled 2>/dev/null || true
+# memory guardrail for tailscaled (drop-in; the vendor package owns the base unit)
+if systemctl list-unit-files tailscaled.service >/dev/null 2>&1; then
+  install -d /etc/systemd/system/tailscaled.service.d
+  install -m 644 "$REPO/deploy/tailscaled-memory.conf" /etc/systemd/system/tailscaled.service.d/memory.conf
+  systemctl daemon-reload
+  systemctl try-restart tailscaled 2>/dev/null || true
+fi
+
 cat <<EOF
 
 Installed. Next steps:
   1. sudo reboot            # apply the UART / Bluetooth change
-  2. sudo tailscale up      # join your tailnet
+  2. sudo tailscale up      # join your tailnet (opens a login link)
   3. open http://<pi-ip>:8080
 EOF

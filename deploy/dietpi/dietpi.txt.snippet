@@ -1,0 +1,26 @@
+# ── PM2.5 monitor: keys to set in /boot/dietpi.txt before first boot ──
+# Edit these keys in place in the stock dietpi.txt. Do NOT replace the whole file — it
+# carries many other defaults. Then add Automation_Custom_Script.sh and dietpi-wifi.txt
+# next to it on the boot partition.
+
+# Fully unattended, headless first run:
+AUTO_SETUP_ACCEPT_LICENSE=1
+AUTO_SETUP_AUTOMATED=1
+
+# Localisation / identity (set your own):
+AUTO_SETUP_TIMEZONE=America/Los_Angeles
+AUTO_SETUP_NET_HOSTNAME=pm25-monitor
+
+# Networking: Wi-Fi for an outdoor node (fill credentials in dietpi-wifi.txt):
+AUTO_SETUP_NET_ETHERNET_ENABLED=0
+AUTO_SETUP_NET_WIFI_ENABLED=1
+AUTO_SETUP_NET_WIFI_COUNTRY_CODE=US
+
+# Prerequisites installed at first boot (git for clone/update, iw for Wi-Fi power-save off):
+AUTO_SETUP_APT_INSTALLS=git iw ca-certificates curl
+
+# Run our post-install hook (/boot/Automation_Custom_Script.sh):
+AUTO_SETUP_CUSTOM_SCRIPT_EXEC=1
+
+# Keep it lean + headless:
+SURVEY_OPTED_IN=0

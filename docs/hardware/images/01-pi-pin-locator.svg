@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200" role="img" aria-labelledby="title description">
+  <title id="title">Pi Zero 2 W physical pin locator</title>
+  <desc id="description">Top view with components up, GPIO header at top, microSD at left and ports at bottom. Even pins are in the outer row, odd pins in the inner row. Enlarged first eight pairs locate all ten jumper wires.</desc>
+  <rect width="1600" height="1200" fill="#ffffff"/>
+  <g font-family="DejaVu Sans, sans-serif" fill="#22282b">
+    <text x="60" y="65" font-size="36" font-weight="bold">01 / Find the right Pi pins</text>
+    <text x="60" y="108" font-size="23">TOP VIEW: components facing you. Keep the board in this orientation while wiring.</text>
+    <rect x="260" y="160" width="1080" height="500" rx="34" fill="#247447" stroke="#16502f" stroke-width="4"/>
+    <g fill="#d8cf8a" stroke="#e9dfa5" stroke-width="9">
+      <circle cx="292" cy="192" r="17"/><circle cx="1308" cy="192" r="17"/>
+      <circle cx="292" cy="628" r="17"/><circle cx="1308" cy="628" r="17"/>
+    </g>
+    <rect x="340" y="187" width="910" height="81" rx="4" fill="#202524"/>
+    <g font-size="16" text-anchor="middle" fill="#ffffff">
+      <text x="364" y="180">2</text><text x="408" y="180">4</text><text x="452" y="180">6</text><text x="496" y="180">8</text><text x="540" y="180">10</text>
+      <text x="584" y="180">12</text><text x="628" y="180">14</text><text x="672" y="180">16</text><text x="716" y="180">18</text><text x="760" y="180">20</text>
+      <text x="804" y="180">22</text><text x="848" y="180">24</text><text x="892" y="180">26</text><text x="936" y="180">28</text><text x="980" y="180">30</text>
+      <text x="1024" y="180">32</text><text x="1068" y="180">34</text><text x="1112" y="180">36</text><text x="1156" y="180">38</text><text x="1200" y="180">40</text>
+      <text x="364" y="292">1</text><text x="408" y="292">3</text><text x="452" y="292">5</text><text x="496" y="292">7</text><text x="540" y="292">9</text>
+      <text x="584" y="292">11</text><text x="628" y="292">13</text><text x="672" y="292">15</text><text x="716" y="292">17</text><text x="760" y="292">19</text>
+      <text x="804" y="292">21</text><text x="848" y="292">23</text><text x="892" y="292">25</text><text x="936" y="292">27</text><text x="980" y="292">29</text>
+      <text x="1024" y="292">31</text><text x="1068" y="292">33</text><text x="1112" y="292">35</text><text x="1156" y="292">37</text><text x="1200" y="292">39</text>
+    </g>
+    <g fill="#d7ba69" stroke="#f5dfa2" stroke-width="2">
+      <circle cx="364" cy="208" r="12" id="pi-pin-2" data-wire="W1" fill="#c33e32"/>
+      <circle cx="408" cy="208" r="12"/><circle cx="452" cy="208" r="12" id="pi-pin-6" data-wire="W2" fill="#24282d"/>
+      <circle cx="496" cy="208" r="12" id="pi-pin-8" data-wire="W6" fill="#ffffff"/>
+      <circle cx="540" cy="208" r="12" id="pi-pin-10" data-wire="W3" fill="#1874c6"/>
+      <circle cx="584" cy="208" r="12"/><circle cx="628" cy="208" r="12"/><circle cx="672" cy="208" r="12"/>
+      <circle cx="716" cy="208" r="12"/><circle cx="760" cy="208" r="12"/><circle cx="804" cy="208" r="12"/><circle cx="848" cy="208" r="12"/>
+      <circle cx="892" cy="208" r="12"/><circle cx="936" cy="208" r="12"/><circle cx="980" cy="208" r="12"/><circle cx="1024" cy="208" r="12"/>
+      <circle cx="1068" cy="208" r="12"/><circle cx="1112" cy="208" r="12"/><circle cx="1156" cy="208" r="12"/><circle cx="1200" cy="208" r="12"/>
+      <rect x="352" y="236" width="24" height="24" id="pi-pin-1" data-wire="W7" fill="#c66218" stroke="#ffffff" stroke-width="3"/>
+      <circle cx="408" cy="248" r="12" id="pi-pin-3" data-wire="W9" fill="#b18a00"/>
+      <circle cx="452" cy="248" r="12" id="pi-pin-5" data-wire="W10" fill="#7d55b5"/>
+      <circle cx="496" cy="248" r="12"/><circle cx="540" cy="248" r="12" id="pi-pin-9" data-wire="W8" fill="#24282d"/>
+      <circle cx="584" cy="248" r="12"/><circle cx="628" cy="248" r="12" id="pi-pin-13" data-wire="W5" fill="#6c747c"/>
+      <circle cx="672" cy="248" r="12" id="pi-pin-15" data-wire="W4" fill="#168252"/>
+      <circle cx="716" cy="248" r="12"/><circle cx="760" cy="248" r="12"/><circle cx="804" cy="248" r="12"/><circle cx="848" cy="248" r="12"/>
+      <circle cx="892" cy="248" r="12"/><circle cx="936" cy="248" r="12"/><circle cx="980" cy="248" r="12"/><circle cx="1024" cy="248" r="12"/>
+      <circle cx="1068" cy="248" r="12"/><circle cx="1112" cy="248" r="12"/><circle cx="1156" cy="248" r="12"/><circle cx="1200" cy="248" r="12"/>
+    </g>
+    <rect x="274" y="369" width="159" height="155" rx="5" fill="#d7dbdc" stroke="#8c9699" stroke-width="3"/>
+    <path d="M278 405 H413 M278 418 H413 M278 431 H413" fill="none" stroke="#9da5a7" stroke-width="5"/>
+    <rect x="272" y="466" width="96" height="44" fill="#353b40"/>
+    <text x="352" y="562" text-anchor="middle" fill="#ffffff" font-size="19">microSD</text>
+    <rect x="675" y="340" width="200" height="185" rx="6" fill="#25292b"/>
+    <text x="775" y="417" text-anchor="middle" fill="#e7ecea" font-size="29">RP3A0</text>
+    <text x="775" y="451" text-anchor="middle" fill="#bbc4c0" font-size="18">processor</text>
+    <rect x="956" y="340" width="179" height="147" rx="4" fill="#c6cccf" stroke="#e3e7e8" stroke-width="5"/>
+    <text x="1045" y="421" text-anchor="middle" font-size="22">radio shield</text>
+    <rect x="1323" y="310" width="25" height="217" fill="#eff0e8" stroke="#c2c7c2" stroke-width="2"/>
+    <rect x="1329" y="310" width="9" height="217" fill="#424849"/>
+    <text x="1400" y="410" font-size="19">camera</text><text x="1400" y="437" font-size="19">connector</text>
+    <g fill="#d7dbdc" stroke="#949da1" stroke-width="3">
+      <rect x="493" y="588" width="169" height="78" rx="6"/>
+      <rect x="1010" y="608" width="98" height="58" rx="5"/>
+      <rect x="1181" y="608" width="98" height="58" rx="5"/>
+    </g>
+    <g fill="#535c61">
+      <rect x="509" y="642" width="137" height="15"/><rect x="1022" y="648" width="74" height="11"/><rect x="1193" y="648" width="74" height="11"/>
+    </g>
+    <text x="578" y="703" text-anchor="middle" font-size="22">mini HDMI</text>
+    <text x="1059" y="703" text-anchor="middle" font-size="22">USB data</text>
+    <text x="1230" y="703" text-anchor="middle" font-size="22" font-weight="bold" fill="#b03229">PWR IN</text>
+    <text x="60" y="250" font-size="25" font-weight="bold">PIN 1</text>
+    <text x="60" y="280" font-size="19">Inner row.</text><text x="60" y="307" font-size="19">Square PCB pad.</text>
+    <path d="M182 245 H337" fill="none" stroke="#c66218" stroke-width="4"/>
+    <path d="M346 245 L330 237 L330 253 Z" fill="#c66218"/>
+    <text x="62" y="427" font-size="22">Card slot</text><path d="M175 435 H258" stroke="#586269" stroke-width="2"/>
+    <text x="60" y="744" font-size="18" fill="#586269">Board illustration, not to scale. Colored contacts identify connections; real header pins are metal.</text>
+    <path d="M60 773 H1540" stroke="#cdd5d8" stroke-width="2"/>
+    <text x="60" y="820" font-size="29" font-weight="bold">Enlarged: first eight pairs, counted from the microSD end</text>
+    <text x="60" y="936" font-size="21" font-weight="bold">OUTER</text><text x="60" y="962" font-size="18">board edge</text>
+    <text x="60" y="1066" font-size="21" font-weight="bold">INNER</text><text x="60" y="1092" font-size="18">components</text>
+    <rect x="231" y="896" width="1279" height="198" rx="7" fill="#f1f4f5"/>
+    <g text-anchor="middle" font-size="18">
+      <text x="305" y="879">W1 PMS 5V</text><text x="470" y="879" fill="#68747b">unused</text>
+      <text x="635" y="879">W2 PMS GND</text><text x="800" y="879">W6 RX (opt.)</text>
+      <text x="965" y="879">W3 PMS TX</text><text x="1130" y="879" fill="#68747b">unused</text>
+      <text x="1295" y="879" fill="#68747b">unused</text><text x="1460" y="879" fill="#68747b">unused</text>
+      <text x="305" y="1131">W7 SHT 3V3</text><text x="470" y="1131">W9 SDA</text><text x="635" y="1131">W10 SCL</text>
+      <text x="800" y="1131" fill="#68747b">unused</text><text x="965" y="1131">W8 SHT GND</text>
+      <text x="1130" y="1131" fill="#68747b">unused</text><text x="1295" y="1131">W5 RESET</text><text x="1460" y="1131">W4 SET</text>
+    </g>
+    <g stroke-width="3" stroke="#b8c3c8">
+      <circle cx="305" cy="938" r="30" fill="#c33e32" stroke="#c33e32"/><circle cx="470" cy="938" r="30" fill="#e0e5e7"/>
+      <circle cx="635" cy="938" r="30" fill="#24282d" stroke="#24282d"/><circle cx="800" cy="938" r="30" fill="#ffffff" stroke="#626e77" stroke-dasharray="6 4"/>
+      <circle cx="965" cy="938" r="30" fill="#1874c6" stroke="#1874c6"/><circle cx="1130" cy="938" r="30" fill="#e0e5e7"/>
+      <circle cx="1295" cy="938" r="30" fill="#e0e5e7"/><circle cx="1460" cy="938" r="30" fill="#e0e5e7"/>
+      <rect x="275" y="1036" width="60" height="60" rx="2" fill="#c66218" stroke="#c66218"/>
+      <circle cx="470" cy="1066" r="30" fill="#b18a00" stroke="#b18a00"/><circle cx="635" cy="1066" r="30" fill="#7d55b5" stroke="#7d55b5"/>
+      <circle cx="800" cy="1066" r="30" fill="#e0e5e7"/><circle cx="965" cy="1066" r="30" fill="#24282d" stroke="#24282d"/>
+      <circle cx="1130" cy="1066" r="30" fill="#e0e5e7"/><circle cx="1295" cy="1066" r="30" fill="#6c747c" stroke="#6c747c"/>
+      <circle cx="1460" cy="1066" r="30" fill="#168252" stroke="#168252"/>
+    </g>
+    <g font-size="26" font-weight="bold" text-anchor="middle">
+      <text x="305" y="947" fill="#ffffff">2</text><text x="470" y="947">4</text><text x="635" y="947" fill="#ffffff">6</text><text x="800" y="947">8</text>
+      <text x="965" y="947" fill="#ffffff">10</text><text x="1130" y="947">12</text><text x="1295" y="947">14</text><text x="1460" y="947">16</text>
+      <text x="305" y="1075" fill="#ffffff">1</text><text x="470" y="1075" fill="#ffffff">3</text><text x="635" y="1075" fill="#ffffff">5</text><text x="800" y="1075">7</text>
+      <text x="965" y="1075" fill="#ffffff">9</text><text x="1130" y="1075">11</text><text x="1295" y="1075" fill="#ffffff">13</text><text x="1460" y="1075" fill="#ffffff">15</text>
+    </g>
+    <text x="60" y="1179" font-size="21" font-weight="bold">Numbers inside the contacts are PHYSICAL pin positions, not GPIO numbers. Disconnect power first.</text>
+  </g>
+</svg>

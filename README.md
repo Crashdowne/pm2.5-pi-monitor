@@ -18,6 +18,9 @@ server/      authenticated multi-sensor warehouse + fleet dashboard
 
 ## Hardware wiring (PMS5003 -> Pi 40-pin)
 
+For illustrated, hardware-only assembly instructions covering both sensors, the microSD
+card, power, and jumper options, see the [step-by-step hardware guide](docs/hardware/HARDWARE_SETUP.md).
+
 | PMS5003 | Function | Pi phys pin | Pi GPIO |
 |---|---|---|---|
 | VCC | 5 V | 2 or 4 | 5 V |
@@ -35,16 +38,29 @@ hourly temperature and relative-humidity history.
 
 ## Install on the Pi (DietPi)
 
+Use the **DietPi ARM64 (64-bit) image** (Debian Trixie) for the Pi Zero 2 W. 64-bit +
+Trixie (glibc 2.41) lets every Python dependency install from a prebuilt wheel, so no
+compiler is needed on the Pi.
+
+**Zero-touch (headless, no GUI):** flash the image, then drop three files on the boot
+partition for a fully unattended first-boot install - see
+[deploy/dietpi/README.md](deploy/dietpi/README.md).
+
+**Manual:**
+
 ```bash
 git clone <repo> /opt/pm25 && cd /opt/pm25
-sudo deploy/install.sh      # installs uv, deps, frees the UART, installs systemd services
+sudo deploy/install.sh      # deps, UART/I2C, systemd services, and the Tailscale client
 sudo reboot                 # applies the UART / Bluetooth change
-sudo tailscale up           # join your tailnet
+sudo tailscale up           # join your tailnet (opens a login link)
 ```
 
-`install.sh` writes `/etc/pm25/config.toml` from the example on first run. The dashboard is
-then at `http://<pi-lan-or-tailscale-ip>:8080`. Installation creates the complete SQLite
-schema, including SHT31 temperature and humidity rollups, before starting the services.
+`install.sh` also installs the Tailscale client and enables `tailscaled`; join your tailnet
+after first boot by running `sudo tailscale up` (it prints a login link to open on any
+device signed into your tailnet). It writes `/etc/pm25/config.toml` from the example on
+first run. The dashboard is then at `http://<pi-lan-or-tailscale-ip>:8080`. Installation
+creates the complete SQLite schema, including SHT31 temperature and humidity rollups, before
+starting the services.
 
 ### Services
 
@@ -54,6 +70,12 @@ schema, including SHT31 temperature and humidity rollups, before starting the se
 | `pm25-web.service` | Flask + waitress API and PWA on port 8080 |
 | `pm25-sync.timer` | offload to the server over Tailscale, then prune (every 6 h) |
 | `pm25-alert.timer` | evaluate AQI, stale sensor, sync, and disk alerts (every 2 min) |
+| `pm25-wifi-powersave.service` | disable Wi-Fi power save so the dashboard stays reachable |
+
+Services run under systemd memory caps (`MemoryMax`), and the journal is kept in RAM
+(`Storage=volatile`) so the SD card mostly sees database writes, not logs. An optional,
+memory-capped Cloudflare Tunnel unit ([deploy/pm25-cloudflared.service](deploy/pm25-cloudflared.service))
+is available if you must expose the dashboard publicly — keep it behind Cloudflare Access.
 
 Update in place: `sudo deploy/update.sh` (`git pull` + `uv sync` + restart).
 
@@ -129,7 +151,9 @@ uv run python -W error::ResourceWarning -m unittest discover -s tests -v
 
 ## Security notes
 
-- Dashboard + ingest are **LAN/tailnet only** - no public exposure, no Tailscale Funnel.
+- Dashboard + ingest are **LAN/tailnet only** by default - no public exposure, no Tailscale
+  Funnel. The optional Cloudflare Tunnel unit is the one exception; gate it with Cloudflare
+  Access, since the dashboard has no built-in authentication.
 - Ingest requires a bearer token and should be bound to `tailscale0` behind an ACL.
 - All SQL is parameterized; API query params are whitelisted.
 - Pi services use separate identities: only `pm25-reader` receives serial/GPIO/I2C access,

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1240" viewBox="0 0 1600 1240" role="img" aria-labelledby="title description">
+  <title id="title">Jumper connector options for the Pi and sensor male headers</title>
+  <desc id="description">Direct option uses a female-to-female wire. Existing male-to-female leads can be paired on a breadboard: the female ends go to the Pi and sensor header, and their male ends go into A1 and E1, which share a connected strip. Use one separate numbered strip per wire ID and leave the power rails unused.</desc>
+  <rect width="1600" height="1240" fill="#ffffff"/>
+  <g font-family="DejaVu Sans, sans-serif" fill="#22282b">
+    <text x="60" y="64" font-size="36" font-weight="bold">04 / Make your jumper leads fit</text>
+    <text x="60" y="106" font-size="22">Female = socket. Male = exposed metal pin. The Pi already has male pins.</text>
+    <text x="60" y="170" font-size="27" font-weight="bold">Option A / Direct: one female-to-female lead per connection</text>
+    <rect x="90" y="214" width="205" height="131" rx="6" fill="#edf5f0" stroke="#719681" stroke-width="2"/>
+    <text x="112" y="254" font-size="23" font-weight="bold">Pi header</text><text x="112" y="286" font-size="20">physical pin 2</text>
+    <rect x="284" y="271" width="52" height="15" fill="#cbb371"/>
+    <rect x="324" y="256" width="72" height="46" rx="3" fill="#2b3135"/>
+    <path d="M396 279 H1204" stroke="#c33e32" stroke-width="8"/>
+    <rect x="1204" y="256" width="72" height="46" rx="3" fill="#2b3135"/>
+    <rect x="1264" y="271" width="52" height="15" fill="#cbb371"/>
+    <rect x="1305" y="214" width="225" height="131" rx="6" fill="#f2f5f7" stroke="#98a9b4" stroke-width="2"/>
+    <text x="1326" y="254" font-size="23" font-weight="bold">PMS adapter</text><text x="1326" y="286" font-size="20">VCC / 5V pin</text>
+    <text x="800" y="248" font-size="24" font-weight="bold" text-anchor="middle" fill="#a62d25">Example: W1 / 5 V</text>
+    <text x="360" y="337" font-size="19" text-anchor="middle">female socket</text><text x="1240" y="337" font-size="19" text-anchor="middle">female socket</text>
+    <text x="60" y="393" font-size="21">Each socket slips over a soldered male header pin. No breadboard needed. Use 9 leads, or 10 with W6.</text>
+    <path d="M60 424 H1540" stroke="#cdd5d8" stroke-width="2"/>
+    <text x="60" y="478" font-size="27" font-weight="bold">Option B / Your male-to-female leads: join two on a breadboard</text>
+    <text x="60" y="516" font-size="21">Example: W1. The two male ends meet in A1 and E1. Those holes connect internally.</text>
+    <rect x="90" y="561" width="205" height="118" rx="6" fill="#edf5f0" stroke="#719681" stroke-width="2"/>
+    <text x="112" y="602" font-size="23" font-weight="bold">Pi pin 2</text><text x="112" y="635" font-size="19">male header</text>
+    <rect x="284" y="612" width="52" height="15" fill="#cbb371"/>
+    <rect x="324" y="596" width="72" height="46" rx="3" fill="#2b3135"/>
+    <rect x="1305" y="561" width="225" height="118" rx="6" fill="#f2f5f7" stroke="#98a9b4" stroke-width="2"/>
+    <text x="1326" y="602" font-size="23" font-weight="bold">PMS VCC</text><text x="1326" y="635" font-size="19">male header</text>
+    <rect x="1264" y="612" width="52" height="15" fill="#cbb371"/>
+    <rect x="1204" y="596" width="72" height="46" rx="3" fill="#2b3135"/>
+    <text x="360" y="579" font-size="18" text-anchor="middle">female</text><text x="1240" y="579" font-size="18" text-anchor="middle">female</text>
+    <rect x="470" y="725" width="770" height="346" rx="8" fill="#f1f3f4" stroke="#acb8be" stroke-width="2"/>
+    <rect x="570" y="798" width="353" height="60" rx="5" fill="#fbe5df"/>
+    <rect x="946" y="746" width="30" height="301" fill="#d5dde1"/>
+    <text x="530" y="776" font-size="18" text-anchor="middle">ROW</text>
+    <g font-size="22" text-anchor="middle" font-weight="bold">
+      <text x="605" y="776">A</text><text x="675" y="776">B</text><text x="745" y="776">C</text><text x="815" y="776">D</text><text x="885" y="776">E</text>
+      <text x="1010" y="776">F</text><text x="1055" y="776">G</text><text x="1100" y="776">H</text><text x="1145" y="776">I</text><text x="1190" y="776">J</text>
+      <text x="530" y="846">1</text><text x="530" y="926">2</text><text x="530" y="1006">3</text>
+    </g>
+    <g stroke="#c9d0d4" stroke-width="7">
+      <path d="M605 828 H885" stroke="#d58a7b"/><path d="M605 918 H885"/><path d="M605 998 H885"/>
+      <path d="M1010 828 H1190"/><path d="M1010 918 H1190"/><path d="M1010 998 H1190"/>
+    </g>
+    <g fill="#ffffff" stroke="#96a2a9" stroke-width="2">
+      <circle cx="605" cy="828" r="10"/><circle cx="675" cy="828" r="10"/><circle cx="745" cy="828" r="10"/><circle cx="815" cy="828" r="10"/><circle cx="885" cy="828" r="10"/>
+      <circle cx="605" cy="918" r="10"/><circle cx="675" cy="918" r="10"/><circle cx="745" cy="918" r="10"/><circle cx="815" cy="918" r="10"/><circle cx="885" cy="918" r="10"/>
+      <circle cx="605" cy="998" r="10"/><circle cx="675" cy="998" r="10"/><circle cx="745" cy="998" r="10"/><circle cx="815" cy="998" r="10"/><circle cx="885" cy="998" r="10"/>
+      <circle cx="1010" cy="828" r="8"/><circle cx="1055" cy="828" r="8"/><circle cx="1100" cy="828" r="8"/><circle cx="1145" cy="828" r="8"/><circle cx="1190" cy="828" r="8"/>
+      <circle cx="1010" cy="918" r="8"/><circle cx="1055" cy="918" r="8"/><circle cx="1100" cy="918" r="8"/><circle cx="1145" cy="918" r="8"/><circle cx="1190" cy="918" r="8"/>
+      <circle cx="1010" cy="998" r="8"/><circle cx="1055" cy="998" r="8"/><circle cx="1100" cy="998" r="8"/><circle cx="1145" cy="998" r="8"/><circle cx="1190" cy="998" r="8"/>
+    </g>
+    <path d="M396 619 H430 V828 H588" fill="none" stroke="#c33e32" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M1204 619 H961 V828 H902" fill="none" stroke="#c33e32" stroke-width="8" stroke-linejoin="round"/>
+    <rect x="577" y="819" width="28" height="18" rx="2" fill="#2b3135"/><rect x="599" y="822" width="15" height="12" fill="#cbb371"/>
+    <rect x="885" y="819" width="28" height="18" rx="2" fill="#2b3135"/><rect x="877" y="822" width="15" height="12" fill="#cbb371"/>
+    <text x="650" y="672" font-size="20" text-anchor="middle">two separate leads</text>
+    <text x="605" y="889" font-size="20" text-anchor="middle" font-weight="bold">male into A1</text>
+    <text x="885" y="889" font-size="20" text-anchor="middle" font-weight="bold">male into E1</text>
+    <text x="96" y="891" font-size="22" font-weight="bold">A1-E1: one connection.</text>
+    <text x="96" y="927" font-size="19">A2-E2: a different connection.</text>
+    <text x="96" y="960" font-size="19">Never mix W-numbers in a strip.</text>
+    <text x="1265" y="875" font-size="19">F-J stays</text><text x="1265" y="902" font-size="19">disconnected.</text>
+    <text x="1265" y="945" font-size="19">No power</text><text x="1265" y="972" font-size="19">rails used.</text>
+    <text x="60" y="1122" font-size="22" font-weight="bold">Repeat on separate strips: W2 at A2/E2, W3 at A3/E3, ... W10 at A10/E10.</text>
+    <text x="60" y="1161" font-size="21">Use 18 male-to-female leads for 9 connections, or 20 with W6. Leave row 6 empty if W6 is omitted.</text>
+    <text x="60" y="1205" font-size="20">Standard breadboard shown. Confirm its connected strips while unpowered. Do not use loose board holes as sockets.</text>
+  </g>
+</svg>

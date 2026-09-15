@@ -47,12 +47,14 @@ class SyncConfig:
     server_url: str = ""
     token_env: str = "PM25_SYNC_TOKEN"
     sensor_id: str = "default"
-    batch_size: int = 500
+    batch_size: int = 200  # <=329 keeps one aqi-worker ingest under the free-tier D1 query cap
     pressure_keep_days: int = 7
     trigger_db_size_mb: int = 200
     trigger_disk_free_mb: int = 200
     retry_total: int = 3
     gzip_enabled: bool = True
+    access_client_id_env: str = ""
+    access_client_secret_env: str = ""
 
 
 @dataclass(frozen=True)
@@ -166,12 +168,14 @@ def load_config(path: str | Path) -> Config:
         server_url=y.get("server_url", ""),
         token_env=y.get("token_env", "PM25_SYNC_TOKEN"),
         sensor_id=str(y.get("sensor_id", "default")),
-        batch_size=int(y.get("batch_size", 500)),
+        batch_size=int(y.get("batch_size", 200)),
         pressure_keep_days=int(y.get("pressure_keep_days", 7)),
         trigger_db_size_mb=int(y.get("trigger_db_size_mb", 200)),
         trigger_disk_free_mb=int(y.get("trigger_disk_free_mb", 200)),
         retry_total=int(y.get("retry_total", 3)),
         gzip_enabled=bool(y.get("gzip_enabled", True)),
+        access_client_id_env=str(y.get("access_client_id_env", "")),
+        access_client_secret_env=str(y.get("access_client_secret_env", "")),
     )
 
     a = data.get("alerts", {})
