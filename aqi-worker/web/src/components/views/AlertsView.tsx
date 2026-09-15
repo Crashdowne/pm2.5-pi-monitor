@@ -15,6 +15,8 @@ export default function AlertsView() {
   const [quietStart, setQuietStart] = useState(22);
   const [quietEnd, setQuietEnd] = useState(7);
   const [saved, setSaved] = useState(false);
+  const [token, setToken] = useState(() => localStorage.getItem("aqi_admin_token") ?? "");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     getAlerts().then((d) => {
@@ -29,16 +31,32 @@ export default function AlertsView() {
   }, []);
 
   async function save() {
-    const updated = await postAlerts({
-      enabled,
-      notify_from: notifyFrom,
-      min_interval_s: Math.max(300, interval * 60),
-      quiet_start_hour: quietEnabled ? quietStart : -1,
-      quiet_end_hour: quietEnabled ? quietEnd : -1,
-    });
-    setData(updated);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setError("");
+    try {
+      const updated = await postAlerts(
+        {
+          enabled,
+          notify_from: notifyFrom,
+          min_interval_s: Math.max(300, interval * 60),
+          quiet_start_hour: quietEnabled ? quietStart : -1,
+          quiet_end_hour: quietEnabled ? quietEnd : -1,
+        },
+        token,
+      );
+      localStorage.setItem("aqi_admin_token", token);
+      setData(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      setError(
+        msg.startsWith("401")
+          ? "Wrong admin token."
+          : msg.startsWith("503")
+            ? "Alert editing is disabled on this server."
+            : "Could not save settings.",
+      );
+    }
   }
 
   const levels = data?.levels.filter((l) => l !== "none") ?? ["carry", "recommended", "strong", "indoors"];
@@ -127,9 +145,24 @@ export default function AlertsView() {
         </div>
       )}
 
+      <div className="rounded-2xl bg-white/4 border border-white/10 p-4">
+        <p className="text-xs text-white/40 uppercase tracking-widest font-medium mb-2">Admin token</p>
+        <input
+          type="password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="Required to save changes"
+          className="w-full bg-white/8 border border-white/12 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-sky-500/50"
+        />
+        <p className="text-xs text-white/30 mt-2">Alert settings are shared server-side. Saving requires the server's ADMIN_TOKEN; it is kept only in this browser.</p>
+      </div>
+
+      {error && <p className="text-sm text-rose-400" role="alert">{error}</p>}
+
       <button
         onClick={save}
-        className={`rounded-xl py-3.5 font-semibold text-sm transition-all
+        disabled={!token}
+        className={`rounded-xl py-3.5 font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed
           ${saved ? "bg-green-500/20 border border-green-500/40 text-green-400" : "bg-sky-500/20 border border-sky-500/30 text-sky-300 hover:bg-sky-500/30"}`}
       >
         {saved ? "✓ Saved" : "Save alert settings"}

@@ -88,6 +88,31 @@ export async function saveOverrides(
   return clean;
 }
 
+// Validate a raw override payload from the (admin-gated) POST. Only keys that are present
+// are checked; absent keys keep their configured defaults. Returns an error string, or
+// null when acceptable.
+export function validateOverrides(obj: Record<string, unknown>): string | null {
+  if ("enabled" in obj && typeof obj.enabled !== "boolean") return "enabled must be a boolean";
+  if ("notify_from" in obj && !(mask.LEVELS as readonly string[]).includes(String(obj.notify_from))) {
+    return "invalid notify_from level";
+  }
+  if ("min_interval_s" in obj) {
+    const v = obj.min_interval_s;
+    if (typeof v !== "number" || !Number.isInteger(v) || v < 300 || v > 86400) {
+      return "min_interval_s must be an integer between 300 and 86400";
+    }
+  }
+  for (const key of ["quiet_start_hour", "quiet_end_hour"] as const) {
+    if (key in obj) {
+      const v = obj[key];
+      if (typeof v !== "number" || !Number.isInteger(v) || v < -1 || v > 23) {
+        return `${key} must be an integer between -1 and 23`;
+      }
+    }
+  }
+  return null;
+}
+
 export function effectiveAlerts(
   base: AlertsConfig,
   overrides: Record<string, unknown>,

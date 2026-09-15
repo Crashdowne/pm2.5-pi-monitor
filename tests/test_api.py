@@ -43,6 +43,11 @@ class ApiTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
+    def test_security_headers_present(self) -> None:
+        response = self.client.get("/api/health")
+        self.assertEqual(response.headers.get("X-Content-Type-Options"), "nosniff")
+        self.assertIn("Content-Security-Policy", response.headers)
+
     def test_current_includes_health_and_supports_etag(self) -> None:
         response = self.client.get("/api/current")
 

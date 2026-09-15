@@ -57,13 +57,17 @@ describe("pollOnce", () => {
 });
 
 describe("alerts config API", () => {
+  const ADMIN = "admin-secret";
+  const adminEnv = () => ({ DB: db, ADMIN_TOKEN: ADMIN }) as unknown as Env;
+  const authHeaders = { "content-type": "application/json", authorization: `Bearer ${ADMIN}` };
+
   it("persists overrides and reflects them", async () => {
-    const env = plainEnv();
+    const env = adminEnv();
     const res = await handleRequest(
       new Request("https://x/api/alerts", {
         method: "POST",
         body: JSON.stringify({ enabled: true, notify_from: "strong", min_interval_s: 1800 }),
-        headers: { "content-type": "application/json" },
+        headers: authHeaders,
       }),
       env,
     );
@@ -81,9 +85,9 @@ describe("alerts config API", () => {
       new Request("https://x/api/alerts", {
         method: "POST",
         body: JSON.stringify({ notify_from: "bogus" }),
-        headers: { "content-type": "application/json" },
+        headers: authHeaders,
       }),
-      plainEnv(),
+      adminEnv(),
     );
     expect(res.status).toBe(400);
   });

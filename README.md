@@ -34,7 +34,9 @@ level shifter needed). An **SHT31-D** humidity/temp sensor (I2C, address `0x44`;
 pin 3, SCL=GPIO3 pin 5) is enabled in the sample config; `install.sh` turns on I2C. Set
 `sht31.enabled = false` if you haven't wired it. When RH is available, PM2.5 is
 humidity-corrected (EPA/Barkjohn); the local and fleet dashboards show corrected PM plus
-hourly temperature and relative-humidity history.
+hourly temperature and relative-humidity history. Enabling `sht31` later starts climate
+history from that point on; earlier readings are not back-filled, since past relative
+humidity was never stored.
 
 ## Install on the Pi (DietPi)
 
@@ -79,6 +81,23 @@ is available if you must expose the dashboard publicly — keep it behind Cloudf
 
 Update in place: `sudo deploy/update.sh` (`git pull` + `uv sync` + restart).
 
+## Choosing a backend
+
+History can be offloaded to one of two backends:
+
+- **Cloudflare Worker + D1 ([aqi-worker/](aqi-worker/), recommended).** The Pi *pushes* to a
+  serverless Worker (no inbound path to the Pi), which stores readings in D1 and serves a
+  public, read-only dashboard on Cloudflare's free tier. Gate alert-config edits with an
+  `ADMIN_TOKEN` secret and add a Cloudflare rate-limiting rule on `/ingest`. See
+  [aqi-worker/PLAN.md](aqi-worker/PLAN.md).
+- **Self-hosted warehouse ([server/ingest.py](server/ingest.py), legacy).** A small
+  Flask/waitress app on a tailnet host, described below. Still supported for fully
+  self-hosted setups.
+
+Both speak the same ingest contract
+([contracts/ingest_ranges.json](contracts/ingest_ranges.json)), so the Pi repoints with
+only a `sync.server_url` (and auth-header) change.
+
 ## Enabling Tailscale offload
 
 1. Stand up the server (see below) and note its MagicDNS name / tailnet IP.
@@ -91,7 +110,11 @@ Update in place: `sudo deploy/update.sh` (`git pull` + `uv sync` + restart).
 The Pi pushes unacknowledged raw rows and marks each row only after the server accepts its batch.
 Pruning removes only acknowledged rows. Rollups stay on the Pi so the weekly view works offline.
 
-## Server (warehouse)
+## Server (warehouse) — self-hosted (legacy)
+
+> The Cloudflare Worker in [aqi-worker/](aqi-worker/) is the recommended backend (see
+> [Choosing a backend](#choosing-a-backend)). Use this self-hosted warehouse only if you
+> prefer to run your own host.
 
 ```bash
 export PM25_INGEST_TOKEN=<same-token>
@@ -99,7 +122,9 @@ uv run python server/ingest.py --db /var/lib/pm25-server/pm25.db --port 9000
 ```
 
 Bind it to the Tailscale interface and lock it down with a tailnet ACL so only the Pi's tag
-can reach the ingest port. Open the same address in a browser for the fleet dashboard.
+can reach the ingest port. Open the same address in a browser for the fleet dashboard. The
+read API and dashboard are unauthenticated by default (tailnet-only); set `PM25_READ_TOKEN`
+to require HTTP Basic auth on them without affecting token-based ingest.
 
 For per-monitor credentials, replace the shared token with a JSON map:
 
@@ -155,6 +180,11 @@ uv run python -W error::ResourceWarning -m unittest discover -s tests -v
   Funnel. The optional Cloudflare Tunnel unit is the one exception; gate it with Cloudflare
   Access, since the dashboard has no built-in authentication.
 - Ingest requires a bearer token and should be bound to `tailscale0` behind an ACL.
+- The Cloudflare Worker keeps its dashboard public but gates alert-config writes behind an
+  `ADMIN_TOKEN` secret (fail-closed when unset); add a Cloudflare rate-limiting rule on
+  `/ingest`. The self-hosted warehouse can require HTTP Basic on reads via `PM25_READ_TOKEN`.
+- Responses carry a strict Content-Security-Policy plus `X-Content-Type-Options`,
+  `Referrer-Policy`, and `X-Frame-Options`.
 - All SQL is parameterized; API query params are whitelisted.
 - Pi services use separate identities: only `pm25-reader` receives serial/GPIO/I2C access,
    only sync/alerts can read secrets, and all four share the SQLite data group.

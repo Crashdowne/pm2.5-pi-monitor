@@ -33,11 +33,29 @@ function render(rows) {
   fleet.replaceChildren(...rows.map((row) => {
     const tr = document.createElement("tr");
     tr.tabIndex = 0;
-    tr.innerHTML = `<td></td><td><span class="aqi"></span> ${row.aqi.category}</td><td>${fmt(row.pm2_5)} µg/m³</td><td>${age(row.ts)}</td><td>${row.coverage_24h}%</td><td>${fmt(row.temp)}°C / ${fmt(row.rh)}%</td>`;
-    tr.cells[0].textContent = row.sensor_id;
-    const badge = tr.querySelector(".aqi");
+
+    const cell = (text) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      return td;
+    };
+
+    const aqiTd = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className = "aqi";
     badge.textContent = row.aqi.value;
     badge.style.background = row.aqi.color;
+    aqiTd.append(badge, ` ${row.aqi.category}`);
+
+    tr.append(
+      cell(row.sensor_id),
+      aqiTd,
+      cell(`${fmt(row.pm2_5)} µg/m³`),
+      cell(age(row.ts)),
+      cell(`${row.coverage_24h}%`),
+      cell(`${fmt(row.temp)}°C / ${fmt(row.rh)}%`),
+    );
+
     tr.addEventListener("click", () => selectSensor(row.sensor_id));
     tr.addEventListener("keydown", (event) => { if (event.key === "Enter") selectSensor(row.sensor_id); });
     return tr;

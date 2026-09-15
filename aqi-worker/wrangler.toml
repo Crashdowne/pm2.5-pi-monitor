@@ -26,8 +26,9 @@ directory = "web/dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
-# Non-secret configuration. Secrets (INGEST_TOKEN, NTFY_TOKEN) are set with
-# `wrangler secret put <NAME>` and, for local dev, in .dev.vars.
+# Non-secret configuration. Secrets (INGEST_TOKEN, ADMIN_TOKEN, NTFY_TOKEN) are set with
+# `wrangler secret put <NAME>` and, for local dev, in .dev.vars. ADMIN_TOKEN gates
+# alert-config writes (POST /api/alerts); when it is unset those writes are disabled.
 [vars]
 SITE_TITLE = "Air Quality"
 TEMP_UNIT = "c"

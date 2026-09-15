@@ -129,6 +129,27 @@ class ServerTests(unittest.TestCase):
         conn.close()
         self.assertNotIn("idx_readings_raw_ts", indexes)
 
+    def test_read_endpoints_require_basic_auth_when_read_token_set(self) -> None:
+        import base64
+
+        client = create_app(self.db_path, "", {"porch": "secret"}, read_token="letmein").test_client()
+        denied = client.get("/api/fleet")
+        self.assertEqual(denied.status_code, 401)
+        self.assertIn("WWW-Authenticate", denied.headers)
+
+        cred = base64.b64encode(b"viewer:letmein").decode()
+        allowed = client.get("/api/fleet", headers={"Authorization": f"Basic {cred}"})
+        self.assertEqual(allowed.status_code, 200)
+
+        # ingest keeps its own bearer token, independent of the read token
+        ping = client.get("/max_ts", headers={"Authorization": "Bearer secret", "X-PM25-Sensor-ID": "porch"})
+        self.assertEqual(ping.status_code, 200)
+
+    def test_security_headers_present_on_responses(self) -> None:
+        response = self.client.get("/api/fleet")
+        self.assertEqual(response.headers.get("X-Content-Type-Options"), "nosniff")
+        self.assertIn("Content-Security-Policy", response.headers)
+
 
 if __name__ == "__main__":
     unittest.main()

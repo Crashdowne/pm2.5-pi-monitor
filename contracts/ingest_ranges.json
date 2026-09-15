@@ -1,0 +1,21 @@
+{
+  "_comment": "Canonical ingest contract shared by server/ingest.py (VALUE_RANGES + limits) and aqi-worker/src/validate.ts. Both sides assert equality in tests (tests/test_ingest_contract.py and aqi-worker/test/contract.test.ts), so changing a bound here forces both validators to match or CI fails.",
+  "ts_min": 1577836800,
+  "ts_max_skew_s": 86400,
+  "max_body_bytes": 5242880,
+  "worker_max_ingest_rows": 329,
+  "value_ranges": {
+    "pm1_0": [0, 5000],
+    "pm2_5": [0, 5000],
+    "pm10": [0, 5000],
+    "pm2_5_corr": [0, 5000],
+    "n0_3": [0, 65535],
+    "n0_5": [0, 65535],
+    "n1_0": [0, 65535],
+    "n2_5": [0, 65535],
+    "n5_0": [0, 65535],
+    "n10": [0, 65535],
+    "rh": [0, 100],
+    "temp": [-80, 100]
+  }
+}

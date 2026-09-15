@@ -9,6 +9,9 @@ export interface Env {
   // ingest auth (bearer token the Pi presents to POST /ingest and GET /max_ts)
   INGEST_TOKEN?: string;
 
+  // admin auth (bearer token required to POST alert-config writes; unset = writes disabled)
+  ADMIN_TOKEN?: string;
+
   // display
   SITE_TITLE?: string;
   TEMP_UNIT?: string; // "c" | "f"

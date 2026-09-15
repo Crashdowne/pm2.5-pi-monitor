@@ -7,8 +7,9 @@ alerts cron) + static React dashboard. 54 tests green (Node `node:sqlite` D1 shi
 A serverless replacement for the VPS analytics sidecar. The Pi **pushes** readings to a
 Cloudflare Worker (no inbound path to the Pi), the Worker stores them in **D1**, and the
 same Worker serves the read-only dashboard + API. The **dashboard is public** (no
-login); only `/ingest` + `/max_ts` are gated by a **bearer token** (`INGEST_TOKEN`).
-Runs entirely on the Cloudflare **free** tier.
+login) for reads; `/ingest` + `/max_ts` are gated by the `INGEST_TOKEN` bearer token, and
+alert-config writes (`POST /api/alerts`) require a separate `ADMIN_TOKEN` (fail-closed when
+unset). Runs entirely on the Cloudflare **free** tier.
 
 > Informational only — **not medical advice.** The mask advisor is derived from public
 > EPA/AirNow AQI bands and configurable thresholds.
@@ -38,15 +39,17 @@ Data flows **outbound** from the Pi only; the Worker never contacts the Pi.
 
 ## Locked decisions
 
-1. **Replace the VPS sidecar.** The Pi pushes only to the Worker; `server/ingest.py` and
-   the old `aqi-site/` Docker image are retired.
+1. **Preferred over the VPS sidecar.** The Pi can push to the Worker instead of a
+   self-hosted host; `server/ingest.py` is retained as a **legacy** self-hosted alternative
+   (the old `aqi-site/` Docker image is retired).
 2. **Full parity**, including server-side alerts (ntfy/webhook via a Cron Trigger).
 3. **Retain all raw readings** in D1; hourly/daily rollups are a query-performance layer,
    not a retention mechanism.
 4. **Ingest auth = bearer token** (`Authorization: Bearer <INGEST_TOKEN>`, a Worker
    secret). `pm25.sync` already sends this header, so only `sync.server_url` changes.
-5. **Dashboard is public** (no login). Cloudflare Access stays an option if privacy is
-   later wanted (free up to 50 users) — no code change required.
+5. **Dashboard is public** for reads (no login); alert-config writes require `ADMIN_TOKEN`
+   (fail-closed when unset). Cloudflare Access stays an option if privacy is later wanted
+   (free up to 50 users) — no code change required.
 
 ## Free-tier engineering
 

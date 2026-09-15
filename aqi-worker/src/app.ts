@@ -3,6 +3,7 @@
 // Read routes bucket from D1 on demand and mirror the shapes the React dashboard expects.
 import * as alerts from "./lib/alerts.ts";
 import * as analytics from "./lib/analytics.ts";
+import { authenticateAdmin } from "./auth.ts";
 import { loadConfig, type AlertsConfig } from "./lib/config.ts";
 import * as db from "./lib/db.ts";
 import type { Env } from "./env.ts";
@@ -201,6 +202,8 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
       return json(alertsView(cfg, await alertSensorRows(env.DB)));
     }
     if (method === "POST") {
+      const auth = await authenticateAdmin(request, env);
+      if (!auth.ok) return text(auth.message ?? "unauthorized", auth.status ?? 401);
       let body: unknown;
       try {
         body = await request.json();
@@ -211,9 +214,8 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
         return text("expected a JSON object", 400);
       }
       const obj = body as Record<string, unknown>;
-      if ("notify_from" in obj && !(mask.LEVELS as readonly string[]).includes(String(obj.notify_from))) {
-        return text("invalid notify_from level", 400);
-      }
+      const invalid = alerts.validateOverrides(obj);
+      if (invalid) return text(invalid, 400);
       await alerts.saveOverrides(env.DB, obj);
       const cfg = alerts.effectiveAlerts(config.alerts, await alerts.loadOverrides(env.DB));
       return json(alertsView(cfg, await alertSensorRows(env.DB)));

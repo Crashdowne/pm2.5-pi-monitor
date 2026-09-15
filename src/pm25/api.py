@@ -32,9 +32,18 @@ def create_app(cfg: Config) -> Flask:
         return db.connect(cfg.storage.db_path)
 
     @app.after_request
-    def revalidate_api(response):
+    def set_response_headers(response):
         if request.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-cache"
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'; "
+            "img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; "
+            "connect-src 'self'; manifest-src 'self'",
+        )
         return response
 
     def health_payload(conn, last_ts: int | None) -> dict:

@@ -29,3 +29,16 @@ export async function authenticateIngest(request: Request, env: Env): Promise<Au
   }
   return { ok: true };
 }
+
+// Admin auth for config writes (e.g. POST /api/alerts). Fails closed: when ADMIN_TOKEN
+// is unset the write surface is disabled entirely, so the public dashboard cannot mutate
+// server-side alert state.
+export async function authenticateAdmin(request: Request, env: Env): Promise<AuthResult> {
+  const expected = env.ADMIN_TOKEN ?? "";
+  if (!expected) return { ok: false, status: 503, message: "admin writes disabled" };
+  const provided = request.headers.get("Authorization") ?? "";
+  if (!timingSafeEqual(provided, `Bearer ${expected}`)) {
+    return { ok: false, status: 401, message: "unauthorized" };
+  }
+  return { ok: true };
+}

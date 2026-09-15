@@ -4,6 +4,11 @@ A Raspberry Pi Zero 2 W + PMS5003 outdoor particulate monitor that reads the sen
 stores readings locally, serves an installable PWA dashboard, and offloads history to a
 central server over Tailscale — all within the Pi's tight CPU/RAM budget on DietPi.
 
+> **Backend note (2026-09):** the recommended offload backend is now the Cloudflare Worker
+> in [aqi-worker/](aqi-worker/) (push-based, serverless, free tier). The Tailscale /
+> self-hosted warehouse (`server/ingest.py`) described below is retained as a legacy
+> alternative; both share one ingest contract (`contracts/ingest_ranges.json`).
+
 ---
 
 ## 1. Goals & constraints

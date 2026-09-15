@@ -18,7 +18,7 @@ import time
 from contextlib import closing
 from pathlib import Path
 
-from flask import Flask, abort, jsonify, request, send_from_directory
+from flask import Flask, Response, abort, jsonify, request, send_from_directory
 
 from pm25 import aqi
 
@@ -154,10 +154,38 @@ def _request_body() -> bytes:
     return raw
 
 
-def create_app(db_path: str, token: str, device_tokens: dict[str, str] | None = None) -> Flask:
+def create_app(
+    db_path: str,
+    token: str,
+    device_tokens: dict[str, str] | None = None,
+    read_token: str = "",
+) -> Flask:
     app = Flask(__name__)
     _init_db(db_path)
     tokens = device_tokens or {}
+
+    @app.before_request
+    def _enforce_read_auth():
+        # Optional: when a read token is configured, gate the dashboard + read API behind
+        # browser-friendly HTTP Basic auth. Ingest routes carry their own bearer token.
+        if not read_token or request.path in ("/ingest", "/max_ts"):
+            return None
+        auth = request.authorization
+        if auth is not None and auth.password and hmac.compare_digest(auth.password, read_token):
+            return None
+        return Response("authentication required", 401, {"WWW-Authenticate": 'Basic realm="pm25 fleet"'})
+
+    @app.after_request
+    def _security_headers(response):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'; "
+            "img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'",
+        )
+        return response
 
     def require_auth() -> str:
         sensor_id = request.headers.get("X-PM25-Sensor-ID", "default")
@@ -327,9 +355,16 @@ def main() -> None:
     if not token and not device_tokens:
         raise SystemExit("Set PM25_INGEST_TOKEN or PM25_INGEST_TOKENS in the environment")
 
+    read_token = os.environ.get("PM25_READ_TOKEN", "")
+
     from waitress import serve
 
-    serve(create_app(args.db, token, device_tokens), host=args.host, port=args.port, threads=4)
+    serve(
+        create_app(args.db, token, device_tokens, read_token),
+        host=args.host,
+        port=args.port,
+        threads=4,
+    )
 
 
 if __name__ == "__main__":

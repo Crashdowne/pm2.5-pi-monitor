@@ -99,7 +99,14 @@ export const getDiurnal = (s: string, range: string) =>
 export const getSummary = (s: string) => fetch(`/api/sensors/${s}/summary`).then(j<Summary>);
 export const getStatus = (s: string) => fetch(`/api/sensors/${s}/status`).then(j<Status>);
 export const getAlerts = () => fetch("/api/alerts").then(j<AlertsView>);
-export const postAlerts = (body: Record<string, unknown>) =>
-  fetch("/api/alerts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(j<AlertsView>);
+export const postAlerts = (body: Record<string, unknown>, token: string) =>
+  fetch("/api/alerts", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  }).then(j<AlertsView>);
 export const exportUrl = (s: string, range: string, format: "csv" | "json") =>
   `/api/sensors/${s}/export?range=${range}&format=${format}`;

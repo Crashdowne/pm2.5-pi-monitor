@@ -4,10 +4,11 @@ import { handleRequest } from "./app.ts";
 import type { Env } from "./env.ts";
 import * as alerts from "./lib/alerts.ts";
 import { loadConfig } from "./lib/config.ts";
+import { withSecurityHeaders } from "./security.ts";
 
 export default {
-  fetch(request: Request, env: Env): Promise<Response> {
-    return handleRequest(request, env);
+  async fetch(request: Request, env: Env): Promise<Response> {
+    return withSecurityHeaders(await handleRequest(request, env));
   },
 
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
