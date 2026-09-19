@@ -20,8 +20,8 @@ ProtectHome=true
 ProtectSystem=strict
 ReadWritePaths=/var/lib/pm25
 MemoryAccounting=yes
-MemoryHigh=120M
-MemoryMax=160M
+MemoryHigh=200M
+MemoryMax=256M
 
 [Install]
 WantedBy=multi-user.target

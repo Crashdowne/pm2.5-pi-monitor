@@ -4,10 +4,11 @@
 [sensor]
 device = "/dev/ttyAMA0"     # PL011 UART (available after disabling Bluetooth, see README)
 baud = 9600
-mode = "duty_cycle"         # "duty_cycle" (default) | "continuous"
-period_s = 180              # duty_cycle: seconds between samples (~20 samples/hour)
-warmup_s = 30               # fan stabilization time after wake (duty_cycle)
-sample_s = 8                # averaging burst length while awake
+mode = "duty_cycle"         # healthy default: duty-cycles the PMS5003 fan/laser to extend its life
+period_s = 180              # sample every 180 s (~20 samples/hour)
+warmup_s = 30               # fan spin-up before each burst (PMS5003 needs ~30 s to stabilize)
+sample_s = 8                # averaging burst length -> fan active ~21% of the time (~4-5x MTBF vs always-on)
+sample_interval_s = 60      # continuous mode only (mode = "continuous"); ignored while duty-cycling
 reset_after_failures = 3    # hardware reset after this many empty sampling cycles
 reopen_after_failures = 6   # reopen UART after this many empty sampling cycles
 use_atmospheric = true      # use the atmospheric/environmental PM values (recommended outdoors)
@@ -20,15 +21,33 @@ address = 0x44              # SHT31-D default (0x44; use 0x45 if the ADDR pin is
 
 [storage]
 db_path = "/var/lib/pm25/pm25.db"
-raw_retention_days = 30     # raw rows kept on the Pi; hourly/daily rollups are kept indefinitely
+raw_retention_days = 30     # keep 30 days of raw locally; hourly/daily rollups are kept indefinitely.
+                            # Sync offloads to the VPS first; prune then deletes only VPS-acknowledged
+                            # rows older than this, so un-synced rows are never lost.
+commit_interval_s = 0       # 0 = commit every sample; only relevant at very high (continuous) sample rates.
 
 [web]
 host = "0.0.0.0"            # reachable over LAN + tailnet; do NOT expose publicly
 port = 8080
+threads = 8                 # waitress worker threads; raise on the Pi 4 (each open SSE live stream holds one)
+
+[dashboard]
+# Presentation + mask advisor for the local React dashboard (served from aqi-worker/web/dist when built).
+site_title = "Air Quality"
+temp_unit = "c"             # "c" | "f"
+tz_offset_hours = 0.0       # local-time offset for calendar/heatmap/diurnal buckets (e.g. -8 for PST)
+live_interval_s = 10        # SSE live-tile refresh cadence (seconds)
+mask_sensitivity = "asthma" # general | asthma | very_sensitive
+# Optional NowCast-AQI threshold overrides (-1 keeps the sensitivity preset):
+# mask_carry_aqi = -1
+# mask_recommended_aqi = -1
+# mask_strong_aqi = -1
+# mask_indoors_aqi = -1
 
 [sync]
-enabled = false             # turn on once the server is reachable over Tailscale
-server_url = ""             # e.g. "http://pm25-server.tailXXXX.ts.net:9000"
+enabled = true              # always offload to the VPS (the durable store). REQUIRED: set server_url below
+                            # and PM25_SYNC_TOKEN in /etc/pm25/sync.env, or sync errors and pruning is skipped (safe)
+server_url = ""             # e.g. "http://pm25-server.tailXXXX.ts.net:9000"  <-- set this before first sync
 token_env = "PM25_SYNC_TOKEN"   # env var holding the bearer token; for aqi-worker set it to the Worker's INGEST_TOKEN
 # Optional Cloudflare Access service token, only if you put Access in front of the endpoint.
 # aqi-worker uses the bearer token above by default; leave these blank for that.

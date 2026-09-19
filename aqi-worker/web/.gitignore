@@ -1,0 +1,6 @@
+# Ship the prebuilt dashboard so the no-Node git deploy (install.sh / update.sh) serves it.
+# The Flask web service serves this dist/ via pm25/api.py `_web_root()`. Build with
+# `npm run build` on a dev machine or in CI, then commit the refreshed dist/.
+# node_modules and other build junk stay ignored via aqi-worker/.gitignore and the repo root.
+!dist/
+!dist/**

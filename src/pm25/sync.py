@@ -62,7 +62,7 @@ def _push(cfg: Config, conn, session: requests.Session) -> None:
     headers = {
         "Content-Type": "application/x-ndjson",
         "X-PM25-Sensor-ID": cfg.sync.sensor_id,
-        "X-PM25-Sample-Period": str(cfg.sensor.period_s if cfg.sensor.mode == "duty_cycle" else 60),
+        "X-PM25-Sample-Period": str(cfg.sensor.period_s if cfg.sensor.mode == "duty_cycle" else cfg.sensor.sample_interval_s),
         **auth,
     }
     url = cfg.sync.server_url.rstrip("/") + "/ingest"

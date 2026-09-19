@@ -79,6 +79,7 @@ def connect(path: str) -> sqlite3.Connection:
         conn.execute("PRAGMA auto_vacuum=INCREMENTAL")
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA temp_store=MEMORY")  # keep temp b-trees in RAM, off the SD card
     return conn
 
 

@@ -2,8 +2,8 @@
 Description=Run PM2.5 offload + prune periodically
 
 [Timer]
-OnBootSec=10min
-OnUnitActiveSec=6h
+OnBootSec=2min
+OnUnitActiveSec=10min
 Persistent=true
 
 [Install]

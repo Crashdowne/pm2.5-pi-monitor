@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AQI">
+  <rect width="512" height="512" rx="96" fill="#0b1220"/>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#1e293b" stroke-width="36"/>
+  <path d="M256 106a150 150 0 0 1 130 75l-52 30a90 90 0 0 0-78-45z" fill="#00e400"/>
+  <path d="M386 181a150 150 0 0 1 6 140l-53-28a90 90 0 0 0-5-82z" fill="#ff7e00"/>
+  <path d="M392 321a150 150 0 0 1-272 0l53-28a90 90 0 0 0 166 0z" fill="#ff0000"/>
+  <circle cx="256" cy="256" r="34" fill="#e6edf7"/>
+</svg>

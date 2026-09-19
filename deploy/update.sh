@@ -11,6 +11,12 @@ git pull --ff-only
 "$(command -v uv)" sync --extra pi
 PYTHON="$REPO/.venv/bin/python"
 
+if [[ -f "$REPO/aqi-worker/web/dist/index.html" ]]; then
+	echo "Dashboard: serving the prebuilt React app from aqi-worker/web/dist"
+else
+	echo "warning: aqi-worker/web/dist not found; serving the lightweight fallback dashboard."
+fi
+
 getent group pm25-data >/dev/null || groupadd --system pm25-data
 getent group pm25-secrets >/dev/null || groupadd --system pm25-secrets
 for user in pm25-reader pm25-web pm25-sync pm25-alert; do

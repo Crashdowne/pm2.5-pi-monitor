@@ -72,6 +72,14 @@ PYTHON="$REPO/.venv/bin/python"
 chown -R pm25-reader:pm25-data /var/lib/pm25
 chmod -R g+rwX /var/lib/pm25
 
+# --- prebuilt dashboard: the web service serves aqi-worker/web/dist when present (no Node on the Pi) ---
+if [[ -f "$REPO/aqi-worker/web/dist/index.html" ]]; then
+  echo "Dashboard: serving the prebuilt React app from aqi-worker/web/dist"
+else
+  echo "warning: aqi-worker/web/dist not found; serving the lightweight fallback dashboard."
+  echo "         Build on a dev machine: 'npm --prefix aqi-worker/web run build', then commit dist/."
+fi
+
 # --- free the UART for the PMS5003 (hand PL011 to the GPIO header) ---
 BOOT=/boot/firmware/config.txt;     [[ -f $BOOT ]]    || BOOT=/boot/config.txt
 CMDLINE=/boot/firmware/cmdline.txt; [[ -f $CMDLINE ]] || CMDLINE=/boot/cmdline.txt

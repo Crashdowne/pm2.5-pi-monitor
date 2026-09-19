@@ -1,18 +1,28 @@
 """Flask JSON API + static PWA serving."""
 from __future__ import annotations
 
+import json
 import os
 import time
 from pathlib import Path
 
-from flask import Flask, abort, jsonify, request, send_from_directory
+from flask import Flask, abort, jsonify, request, send_from_directory, stream_with_context
+from werkzeug.exceptions import NotFound
 
-from . import aqi, db
+from . import analytics, aqi, db, events, forecast, mask
 from .config import Config
 
-WEB_DIR = Path(__file__).resolve().parents[2] / "web"
+_ROOT = Path(__file__).resolve().parents[2]
+LEGACY_WEB_DIR = _ROOT / "web"
+REACT_DIST_DIR = _ROOT / "aqi-worker" / "web" / "dist"
 
-# range -> (bucket_seconds, count, bucket_kind)
+
+def _web_root() -> Path:
+    """Serve the built React dashboard when present, else the no-build legacy PWA."""
+    return REACT_DIST_DIR if (REACT_DIST_DIR / "index.html").exists() else LEGACY_WEB_DIR
+
+
+# range -> (bucket_seconds, count, bucket_kind) for the legacy /api/history endpoint.
 _RANGES = {
     "24h": (3600, 24, "hour"),
     "48h": (3600, 48, "hour"),
@@ -20,6 +30,74 @@ _RANGES = {
     "30d": (86400, 30, "day"),
     "12w": (604800, 12, "week"),
 }
+
+
+def config_payload(cfg: Config) -> dict:
+    """`/api/config` — presentation + mask config the React dashboard reads on load."""
+    d = cfg.dashboard
+    carry, recommended, strong, indoors = mask.resolve_thresholds(
+        d.mask_sensitivity,
+        (d.mask_carry_aqi, d.mask_recommended_aqi, d.mask_strong_aqi, d.mask_indoors_aqi),
+    )
+    presets = {
+        name: {"carry": v[0], "recommended": v[1], "strong": v[2], "indoors": v[3]}
+        for name, v in mask.PRESETS.items()
+    }
+    return {
+        "site_title": d.site_title,
+        "temp_unit": d.temp_unit,
+        "tz_offset_hours": d.tz_offset_hours,
+        "ranges": list(analytics.RANGES.keys()),
+        "bands": [{"upper": upper, "label": label, "color": color} for upper, label, color in analytics.BANDS],
+        "mask": {
+            "sensitivity": d.mask_sensitivity,
+            "thresholds": {"carry": carry, "recommended": recommended, "strong": strong, "indoors": indoors},
+            "presets": presets,
+            "levels": mask.all_levels(),
+            "disclaimer": mask.DISCLAIMER,
+        },
+    }
+
+
+def alerts_payload(cfg: Config, conn) -> dict:
+    """`/api/alerts` — the Pi's webhook alert config mapped into the dashboard view shape."""
+    snap = analytics.current(conn, cfg)
+    sensors = (
+        [{"sensor_id": cfg.sync.sensor_id, "last_level": snap["mask"]["level"], "last_fired_ts": 0}]
+        if snap
+        else []
+    )
+    return {
+        "enabled": cfg.alerts.enabled,
+        "notify_from": "recommended",
+        "min_interval_s": cfg.alerts.cooldown_s,
+        "quiet_start_hour": -1,
+        "quiet_end_hour": -1,
+        "ntfy_configured": False,
+        "webhook_configured": bool(cfg.alerts.webhook_url),
+        "levels": list(mask.LEVELS),
+        "sensors": sensors,
+    }
+
+
+def _sse_pack(data: object) -> str:
+    return f"data: {json.dumps(data)}\n\n"
+
+def sse_current_stream(get_conn, cfg: Config, interval_s: int, max_events: int | None = None):
+    """Yield the current snapshot as SSE events, refreshing every ``interval_s`` seconds."""
+    count = 0
+    while True:
+        conn = get_conn()
+        try:
+            data = analytics.current(conn, cfg)
+        finally:
+            conn.close()
+        yield _sse_pack(data)
+        count += 1
+        if max_events is not None and count >= max_events:
+            return
+        if interval_s > 0:
+            time.sleep(interval_s)
 
 
 def create_app(cfg: Config) -> Flask:
@@ -48,7 +126,7 @@ def create_app(cfg: Config) -> Flask:
 
     def health_payload(conn, last_ts: int | None) -> dict:
         now = int(time.time())
-        period = max(1, cfg.sensor.period_s if cfg.sensor.mode == "duty_cycle" else 60)
+        period = max(1, cfg.sensor.period_s if cfg.sensor.mode == "duty_cycle" else cfg.sensor.sample_interval_s)
         expected_24h = max(1, round(86400 / period))
         received_24h = conn.execute(
             "SELECT COALESCE(sum(samples), 0) FROM readings_hourly WHERE ts_hour >= ?",
@@ -206,7 +284,7 @@ def create_app(cfg: Config) -> Flask:
     @app.get("/api/averages")
     def averages():
         now = int(time.time())
-        period = max(1, cfg.sensor.period_s if cfg.sensor.mode == "duty_cycle" else 60)
+        period = max(1, cfg.sensor.period_s if cfg.sensor.mode == "duty_cycle" else cfg.sensor.sample_interval_s)
         expected_hour = max(1, round(3600 / period))
         expected_day = max(1, round(86400 / period))
         conn = get_conn()
@@ -268,12 +346,152 @@ def create_app(cfg: Config) -> Flask:
         payload.update({"ok": payload["freshness"] in ("fresh", "delayed"), "raw_rows": raw_rows, "db_bytes": db.database_bytes(cfg.storage.db_path)})
         return jsonify(payload)
 
+    @app.get("/api/config")
+    def api_config():
+        return jsonify(config_payload(cfg))
+
+    @app.get("/api/sensors")
+    def api_sensors():
+        conn = get_conn()
+        try:
+            data = analytics.sensors_overview(conn, cfg)
+        finally:
+            conn.close()
+        max_ts = max((s["ts"] for s in data), default=0)
+        response = jsonify(data)
+        response.set_etag(f"{max_ts}-{len(data)}")
+        return response.make_conditional(request)
+
+    @app.get("/api/sensors/<sid>/<action>")
+    def api_sensor_action(sid: str, action: str):
+        if sid != cfg.sync.sensor_id:
+            abort(404)
+        range_key = request.args.get("range", "24h")
+        conn = get_conn()
+        try:
+            if action == "current":
+                data = analytics.current(conn, cfg)
+                if data is None:
+                    abort(404)
+                return jsonify(data)
+            if action == "history":
+                if range_key not in analytics.RANGES:
+                    abort(400)
+                bucket_raw = request.args.get("bucket")
+                bucket = int(bucket_raw) if bucket_raw and bucket_raw.lstrip("-").isdigit() else None
+                return jsonify(analytics.history(conn, cfg, range_key, bucket))
+            if action == "calendar":
+                year_raw = request.args.get("year")
+                year = int(year_raw) if year_raw and year_raw.isdigit() else time.gmtime().tm_year
+                if not 1970 <= year <= 3000:
+                    abort(400)
+                return jsonify(analytics.calendar(conn, cfg, year))
+            if action == "heatmap":
+                if range_key not in analytics.RANGES:
+                    abort(400)
+                return jsonify(analytics.heatmap(conn, cfg, range_key))
+            if action == "distribution":
+                if range_key not in analytics.RANGES:
+                    abort(400)
+                return jsonify(analytics.distribution(conn, cfg, range_key))
+            if action == "diurnal":
+                if range_key not in analytics.RANGES:
+                    abort(400)
+                return jsonify(analytics.diurnal(conn, cfg, range_key))
+            if action == "summary":
+                return jsonify(analytics.summary(conn, cfg))
+            if action == "status":
+                data = analytics.status(conn, cfg)
+                if data is None:
+                    abort(404)
+                return jsonify(data)
+            if action == "mask":
+                data = analytics.current(conn, cfg)
+                if data is None:
+                    abort(404)
+                return jsonify(
+                    {
+                        "sensor_id": cfg.sync.sensor_id,
+                        "aqi": data["nowcast_aqi"],
+                        "mask": data["mask"],
+                        "trend": data["trend"],
+                        "good_window": data["good_window"],
+                    }
+                )
+            if action == "export":
+                if range_key not in analytics.RANGES:
+                    abort(400)
+                fmt = request.args.get("format", "csv")
+                if fmt not in ("csv", "json"):
+                    abort(400)
+                rows = analytics.export_rows(conn, cfg, range_key)
+                if fmt == "json":
+                    return jsonify(rows)
+                lines = ["ts,iso_utc,pm2_5,pm10,temp,rh,aqi"]
+                for r in rows:
+                    iso = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(r["t"])) + "Z"
+                    cells = [r["pm2_5"], r["pm10"], r["temp"], r["rh"]]
+                    lines.append(
+                        ",".join([str(r["t"]), iso, *["" if v is None else str(v) for v in cells], str(r["aqi"])])
+                    )
+                body = "\r\n".join(lines) + "\r\n"
+                return app.response_class(
+                    body,
+                    mimetype="text/csv",
+                    headers={"Content-Disposition": f'attachment; filename="{sid}-{range_key}.csv"'},
+                )
+            if action == "forecast":
+                hours_raw = request.args.get("hours")
+                hours = int(hours_raw) if hours_raw and hours_raw.isdigit() else 6
+                return jsonify(forecast.forecast(conn, cfg, max(1, min(24, hours))))
+            if action == "events":
+                if range_key not in analytics.RANGES:
+                    abort(400)
+                _bucket, span = analytics.RANGES[range_key]
+                return jsonify(events.classify_events(conn, cfg, hours=max(1, span // 3600)))
+            abort(404)
+        finally:
+            conn.close()
+
+    @app.get("/api/sensors/<sid>/stream")
+    def api_sensor_stream(sid: str):
+        if sid != cfg.sync.sensor_id:
+            abort(404)
+        once = request.args.get("once") == "1"
+        interval = max(1, cfg.dashboard.live_interval_s)
+        gen = sse_current_stream(get_conn, cfg, interval, max_events=1 if once else None)
+        return app.response_class(
+            stream_with_context(gen),
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+        )
+
+    @app.get("/api/alerts")
+    def api_alerts():
+        conn = get_conn()
+        try:
+            return jsonify(alerts_payload(cfg, conn))
+        finally:
+            conn.close()
+
+    @app.post("/api/alerts")
+    def api_alerts_post():
+        # Alerts on the Pi are configured in config.toml; the dashboard cannot override them.
+        abort(403, description="Alerts are configured in /etc/pm25/config.toml on this device.")
+
     @app.get("/")
     def index():
-        return send_from_directory(WEB_DIR, "index.html")
+        return send_from_directory(_web_root(), "index.html")
 
     @app.get("/<path:fname>")
     def static_files(fname: str):
-        return send_from_directory(WEB_DIR, fname)
+        root = _web_root()
+        try:
+            return send_from_directory(root, fname)
+        except NotFound:
+            # SPA fallback: extension-less client routes resolve to index.html.
+            if "." in fname.rsplit("/", 1)[-1]:
+                raise
+            return send_from_directory(root, "index.html")
 
     return app

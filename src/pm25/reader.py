@@ -158,13 +158,16 @@ def _run_duty_cycle(conn, sensor: ParticleSensor, cfg: Config, sht) -> None:
 
 def _run_continuous(conn, sensor: ParticleSensor, cfg: Config, sht) -> None:
     s = cfg.sensor
+    interval = max(1, s.sample_interval_s)
+    commit_every = cfg.storage.commit_interval_s
     sensor.wake()
     buf: list[dict] = []
     consecutive_failures = 0
     checksum_errors = 0
     timeout_reads = 0
     transport_errors = 0
-    next_write = (int(time.time()) // 60 + 1) * 60
+    next_write = (int(time.time()) // interval + 1) * interval
+    last_commit = time.monotonic()
     while not _stop:
         try:
             r = sensor.read()
@@ -184,7 +187,7 @@ def _run_continuous(conn, sensor: ParticleSensor, cfg: Config, sht) -> None:
             if buf:
                 consecutive_failures = 0
                 avg = _avg(buf, s.use_atmospheric)
-                sht31_ok = _write(conn, next_write - 60, avg, sht)
+                sht31_ok = _write(conn, next_write - interval, avg, sht)
                 db.record_reader_cycle(
                     conn,
                     cycle_ts,
@@ -195,11 +198,11 @@ def _run_continuous(conn, sensor: ParticleSensor, cfg: Config, sht) -> None:
                     transport_errors=transport_errors,
                     sht31_ok=sht31_ok,
                 )
-                log.info("minute pm2.5=%.1f pm10=%.1f (n=%d)", avg["pm2_5"], avg["pm10"], len(buf))
+                log.info("sample pm2.5=%.1f pm10=%.1f (n=%d)", avg["pm2_5"], avg["pm10"], len(buf))
                 buf = []
             else:
                 consecutive_failures += 1
-                log.warning("no valid frames this minute")
+                log.warning("no valid frames this interval")
                 recovery = _recover_sensor(sensor, cfg, consecutive_failures)
                 db.record_reader_cycle(
                     conn,
@@ -212,11 +215,13 @@ def _run_continuous(conn, sensor: ParticleSensor, cfg: Config, sht) -> None:
                     sht31_ok=None,
                     recovery=recovery,
                 )
-            db.commit(conn)
+            if commit_every <= 0 or time.monotonic() - last_commit >= commit_every:
+                db.commit(conn)
+                last_commit = time.monotonic()
             checksum_errors = 0
             timeout_reads = 0
             transport_errors = 0
-            next_write += 60
+            next_write += interval
 
 
 def run(cfg: Config, simulation_profile: str | None = None) -> None:
@@ -250,6 +255,7 @@ def run(cfg: Config, simulation_profile: str | None = None) -> None:
         else:
             _run_duty_cycle(conn, sensor, cfg, sht)
     finally:
+        conn.commit()  # flush any batched-but-uncommitted samples before closing
         sensor.close()
         if sht is not None:
             sht.close()

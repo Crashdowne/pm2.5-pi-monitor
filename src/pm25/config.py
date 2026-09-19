@@ -21,6 +21,7 @@ class SensorConfig:
     period_s: int = 180
     warmup_s: int = 30
     sample_s: int = 8
+    sample_interval_s: int = 60  # continuous mode: seconds per averaged/written sample
     reset_after_failures: int = 3
     reopen_after_failures: int = 6
     use_atmospheric: bool = True
@@ -33,12 +34,14 @@ class SensorConfig:
 class StorageConfig:
     db_path: str = "/var/lib/pm25/pm25.db"
     raw_retention_days: int = 30
+    commit_interval_s: int = 0  # 0 = commit every sample; >0 batches SD writes (Tier 1 write-min)
 
 
 @dataclass(frozen=True)
 class WebConfig:
     host: str = "0.0.0.0"
     port: int = 8080
+    threads: int = 2  # waitress worker threads (raise on the Pi 4; each SSE client holds one)
 
 
 @dataclass(frozen=True)
@@ -73,12 +76,29 @@ class AlertConfig:
 
 
 @dataclass(frozen=True)
+class DashboardConfig:
+    """Presentation + mask-advisor settings for the local React dashboard."""
+
+    site_title: str = "Air Quality"
+    temp_unit: str = "c"  # "c" | "f"
+    tz_offset_hours: float = 0.0
+    live_interval_s: int = 10  # SSE live-tile refresh cadence (seconds)
+    mask_sensitivity: str = "asthma"  # general | asthma | very_sensitive
+    # Per-threshold NowCast-AQI overrides; negative means "use the sensitivity preset".
+    mask_carry_aqi: int = -1
+    mask_recommended_aqi: int = -1
+    mask_strong_aqi: int = -1
+    mask_indoors_aqi: int = -1
+
+
+@dataclass(frozen=True)
 class Config:
     sensor: SensorConfig
     storage: StorageConfig
     web: WebConfig
     sync: SyncConfig
     alerts: AlertConfig = field(default_factory=AlertConfig)
+    dashboard: DashboardConfig = field(default_factory=DashboardConfig)
 
 
 _SENSOR_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
@@ -90,14 +110,20 @@ def _validate_config(cfg: Config) -> None:
         raise ValueError("sensor.mode must be 'duty_cycle' or 'continuous'")
     if sensor.period_s < 1 or sensor.warmup_s < 0 or sensor.sample_s < 1:
         raise ValueError("sensor timing values must be positive")
+    if sensor.sample_interval_s < 1:
+        raise ValueError("sensor.sample_interval_s must be at least 1")
     if sensor.mode == "duty_cycle" and sensor.period_s <= sensor.warmup_s + sensor.sample_s:
         raise ValueError("sensor.period_s must exceed warmup_s + sample_s in duty_cycle mode")
     if sensor.reset_after_failures < 0 or sensor.reopen_after_failures < 0:
         raise ValueError("sensor recovery thresholds cannot be negative")
     if cfg.storage.raw_retention_days < 1:
         raise ValueError("storage.raw_retention_days must be at least 1")
+    if cfg.storage.commit_interval_s < 0:
+        raise ValueError("storage.commit_interval_s cannot be negative")
     if not 1 <= cfg.web.port <= 65535:
         raise ValueError("web.port must be between 1 and 65535")
+    if not 1 <= cfg.web.threads <= 64:
+        raise ValueError("web.threads must be between 1 and 64")
 
     sync = cfg.sync
     if not _SENSOR_ID_RE.fullmatch(sync.sensor_id):
@@ -116,6 +142,14 @@ def _validate_config(cfg: Config) -> None:
         raise ValueError("alert consecutive_runs must be positive and cooldown_s cannot be negative")
     if alerts.stale_after_s < 1 or alerts.sync_lag_s < 1 or alerts.disk_free_mb < 0 or alerts.request_timeout_s < 1:
         raise ValueError("alert health thresholds must be positive")
+
+    dash = cfg.dashboard
+    if dash.temp_unit not in ("c", "f"):
+        raise ValueError("dashboard.temp_unit must be 'c' or 'f'")
+    if not -14.0 <= dash.tz_offset_hours <= 14.0:
+        raise ValueError("dashboard.tz_offset_hours must be between -14 and 14")
+    if dash.live_interval_s < 1:
+        raise ValueError("dashboard.live_interval_s must be at least 1")
 
 
 def _pin(value: object) -> int | None:
@@ -142,6 +176,7 @@ def load_config(path: str | Path) -> Config:
         period_s=int(s.get("period_s", 180)),
         warmup_s=int(s.get("warmup_s", 30)),
         sample_s=int(s.get("sample_s", 8)),
+        sample_interval_s=int(s.get("sample_interval_s", 60)),
         reset_after_failures=int(s.get("reset_after_failures", 3)),
         reopen_after_failures=int(s.get("reopen_after_failures", 6)),
         use_atmospheric=bool(s.get("use_atmospheric", True)),
@@ -157,10 +192,11 @@ def load_config(path: str | Path) -> Config:
     storage = StorageConfig(
         db_path=st.get("db_path", "/var/lib/pm25/pm25.db"),
         raw_retention_days=int(st.get("raw_retention_days", 30)),
+        commit_interval_s=int(st.get("commit_interval_s", 0)),
     )
 
     w = data.get("web", {})
-    web = WebConfig(host=w.get("host", "0.0.0.0"), port=int(w.get("port", 8080)))
+    web = WebConfig(host=w.get("host", "0.0.0.0"), port=int(w.get("port", 8080)), threads=int(w.get("threads", 2)))
 
     y = data.get("sync", {})
     sync = SyncConfig(
@@ -193,6 +229,19 @@ def load_config(path: str | Path) -> Config:
         request_timeout_s=int(a.get("request_timeout_s", 10)),
     )
 
-    cfg = Config(sensor=sensor, storage=storage, web=web, sync=sync, alerts=alerts)
+    dash = data.get("dashboard", {})
+    dashboard = DashboardConfig(
+        site_title=str(dash.get("site_title", "Air Quality")),
+        temp_unit=str(dash.get("temp_unit", "c")).lower(),
+        tz_offset_hours=float(dash.get("tz_offset_hours", 0.0)),
+        live_interval_s=int(dash.get("live_interval_s", 10)),
+        mask_sensitivity=str(dash.get("mask_sensitivity", "asthma")).lower(),
+        mask_carry_aqi=int(dash.get("mask_carry_aqi", -1)),
+        mask_recommended_aqi=int(dash.get("mask_recommended_aqi", -1)),
+        mask_strong_aqi=int(dash.get("mask_strong_aqi", -1)),
+        mask_indoors_aqi=int(dash.get("mask_indoors_aqi", -1)),
+    )
+
+    cfg = Config(sensor=sensor, storage=storage, web=web, sync=sync, alerts=alerts, dashboard=dashboard)
     _validate_config(cfg)
     return cfg
