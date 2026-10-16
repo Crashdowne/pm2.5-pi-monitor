@@ -10,12 +10,18 @@ dependencies = [
 ]
 
 # Hardware-only deps. Install on the Pi with:  uv sync --extra pi
+# On a Radxa ZERO 3W (or other libgpiod board):  uv sync --extra radxa
 [project.optional-dependencies]
 pi = [
     "pyserial>=3.5",
     "gpiozero>=2.0",
     "lgpio>=0.2",
     "smbus2>=0.4",
+]
+radxa = [
+    "pyserial>=3.5",
+    "smbus2>=0.4",
+    "gpiod>=2.0",
 ]
 
 [project.scripts]

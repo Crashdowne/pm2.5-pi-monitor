@@ -9,7 +9,7 @@ from pathlib import Path
 from flask import Flask, abort, jsonify, request, send_from_directory, stream_with_context
 from werkzeug.exceptions import NotFound
 
-from . import analytics, aqi, db, events, forecast, mask
+from . import analytics, aqi, db, events, forecast, mask, ota
 from .config import Config
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -478,6 +478,33 @@ def create_app(cfg: Config) -> Flask:
     def api_alerts_post():
         # Alerts on the Pi are configured in config.toml; the dashboard cannot override them.
         abort(403, description="Alerts are configured in /etc/pm25/config.toml on this device.")
+
+    @app.get("/api/update")
+    def api_update_status():
+        payload = ota.read_status(cfg.update.state_dir)
+        payload["allow_web_trigger"] = cfg.update.allow_web_trigger
+        payload["actions"] = list(ota.ACTIONS)
+        return jsonify(payload)
+
+    @app.post("/api/update")
+    def api_update_request():
+        # Only tailnet peers and `tailscale serve` (loopback) may ask root to update the code.
+        if not cfg.update.allow_web_trigger:
+            abort(403, description="Dashboard updates are disabled ([update] allow_web_trigger).")
+        if not ota.is_trusted_address(request.remote_addr):
+            abort(403, description="Updates can only be requested over Tailscale.")
+        if not ota.token_matches(os.environ.get(cfg.update.token_env, ""), request.headers.get("Authorization")):
+            abort(401, description="Missing or wrong update token (see /etc/pm25/update.env).")
+        body = request.get_json(silent=True) or {}
+        try:
+            req = ota.request_update(cfg.update.state_dir, str(body.get("action", "pull")))
+        except ValueError as exc:
+            abort(400, description=str(exc))
+        except RuntimeError as exc:
+            abort(409, description=str(exc))
+        except OSError as exc:
+            abort(500, description=f"Could not write the update request: {exc.strerror}")
+        return jsonify({"requested": req}), 202
 
     @app.get("/")
     def index():

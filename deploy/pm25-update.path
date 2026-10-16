@@ -1,0 +1,9 @@
+[Unit]
+Description=PM2.5 monitor: watch for dashboard update requests
+
+[Path]
+PathExists={{OTA_DIR}}/request
+Unit=pm25-update.service
+
+[Install]
+WantedBy=multi-user.target

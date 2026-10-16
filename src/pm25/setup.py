@@ -15,7 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from .config import Config, SHT31Config, SensorConfig, _validate_config, load_config
+from .config import GPIOD_PIN_RE, Config, SHT31Config, SensorConfig, _validate_config, load_config
 
 
 @dataclass
@@ -80,18 +80,20 @@ def _ask_choice(label: str, options: list[str], default: str) -> str:
         print(f"  Choose one of: {joined}")
 
 
-def _ask_pin(label: str, default: int | None) -> int | None:
+def _ask_pin(label: str, default: int | str | None) -> int | str | None:
     shown = str(default) if default is not None else "none"
     while True:
-        resp = _input(f"{label} (BCM number, or 'none') [{shown}]: ").strip().lower()
+        resp = _input(f"{label} (BCM number, 'gpiochipN:line', or 'none') [{shown}]: ").strip().lower()
         if not resp:
             return default
         if resp in ("none", "no", "n", "-1"):
             return None
+        if GPIOD_PIN_RE.fullmatch(resp):
+            return resp
         try:
             value = int(resp)
         except ValueError:
-            print("  Enter a BCM pin number or 'none'.")
+            print("  Enter a BCM pin number, a libgpiod line such as 'gpiochip3:8', or 'none'.")
             continue
         if not 0 <= value <= 27:
             print("  BCM pin must be between 0 and 27.")
@@ -175,15 +177,15 @@ def probe_pms(sensor: SensorConfig, settle_s: float = 3.0, timeout_s: float = 20
         device.close()
 
 
-def probe_sht31(address: int) -> ProbeResult:
+def probe_sht31(address: int, bus: int = 1) -> ProbeResult:
     try:
         from .sensor_sht31 import SHT31
     except Exception as exc:  # pragma: no cover - driver module import
         return ProbeResult(False, f"SHT31 driver unavailable: {exc}")
     try:
-        sensor = SHT31(address=address)
+        sensor = SHT31(bus=bus, address=address)
     except Exception as exc:
-        return ProbeResult(False, f"could not open I2C at {hex(address)}: {exc}")
+        return ProbeResult(False, f"could not open I2C bus {bus} at {hex(address)}: {exc}")
     try:
         rh, temp = sensor.read()
         return ProbeResult(True, f"{temp:.1f} C, {rh:.1f}% RH")
@@ -212,10 +214,12 @@ def _probe_loop(label: str, probe: Callable[[], ProbeResult]) -> bool:
 # --- config rendering + activation ------------------------------------------
 
 def render_config(cfg: Config) -> str:
-    s, h, st, w, y, a = cfg.sensor, cfg.sensor.sht31, cfg.storage, cfg.web, cfg.sync, cfg.alerts
+    s, h, st, w, y, a, u = cfg.sensor, cfg.sensor.sht31, cfg.storage, cfg.web, cfg.sync, cfg.alerts, cfg.update
 
-    def pin(value: int | None) -> int:
-        return value if value is not None else -1
+    def pin(value: int | str | None) -> str:
+        if value is None:
+            return "-1"
+        return quoted(value) if isinstance(value, str) else str(value)
 
     def boolean(value: bool) -> str:
         return "true" if value else "false"
@@ -236,8 +240,9 @@ sample_s = {s.sample_s}
 reset_after_failures = {s.reset_after_failures}
 reopen_after_failures = {s.reopen_after_failures}
 use_atmospheric = {boolean(s.use_atmospheric)}
-pin_enable = {pin(s.pin_enable)}   # BCM pin -> PMS5003 SET; -1 = not wired
-pin_reset = {pin(s.pin_reset)}   # BCM pin -> PMS5003 RESET; -1 = not wired
+pin_enable = {pin(s.pin_enable)}   # PMS5003 SET: BCM pin (Pi) or "gpiochipN:line" (libgpiod); -1 = not wired
+pin_reset = {pin(s.pin_reset)}   # PMS5003 RESET: BCM pin (Pi) or "gpiochipN:line" (libgpiod); -1 = not wired
+i2c_bus = {s.i2c_bus}   # SHT31 I2C bus (/dev/i2c-N): Pi = 1, Radxa ZERO 3W = 3
 
 [sensor.sht31]
 enabled = {boolean(h.enabled)}
@@ -246,6 +251,7 @@ address = {hex(h.address)}
 [storage]
 db_path = {quoted(st.db_path)}
 raw_retention_days = {st.raw_retention_days}
+commit_interval_s = {st.commit_interval_s}
 
 [web]
 host = {quoted(w.host)}
@@ -277,6 +283,14 @@ stale_after_s = {a.stale_after_s}
 sync_lag_s = {a.sync_lag_s}
 disk_free_mb = {a.disk_free_mb}
 request_timeout_s = {a.request_timeout_s}
+
+[update]
+allow_web_trigger = {boolean(u.allow_web_trigger)}
+token_env = {quoted(u.token_env)}
+state_dir = {quoted(u.state_dir)}
+remote = {quoted(u.remote)}
+branch = {quoted(u.branch)}
+auto_pull = {boolean(u.auto_pull)}
 """
 
 
@@ -284,7 +298,7 @@ def _summary(cfg: Config) -> str:
     s = cfg.sensor
     pins = f"SET={s.pin_enable if s.pin_enable is not None else 'none'}, RESET={s.pin_reset if s.pin_reset is not None else 'none'}"
     timing = f"{s.period_s}s period / {s.warmup_s}s warm-up / {s.sample_s}s burst" if s.mode == "duty_cycle" else "continuous"
-    sht = f"enabled @ {hex(s.sht31.address)}" if s.sht31.enabled else "disabled"
+    sht = f"enabled @ {hex(s.sht31.address)} on /dev/i2c-{s.i2c_bus}" if s.sht31.enabled else "disabled"
     return (
         f"  PMS5003 : {s.device} @ {s.baud}, {s.mode} ({timing})\n"
         f"            pins {pins}, atmospheric={s.use_atmospheric}\n"
@@ -305,8 +319,12 @@ def _hardware_notes(cfg: Config) -> list[str]:
     notes: list[str] = []
     if not Path(cfg.sensor.device).exists():
         notes.append(f"{cfg.sensor.device} is missing - enable the UART: run `sudo deploy/install.sh`, then reboot.")
-    if cfg.sensor.sht31.enabled and not any(Path(f"/dev/i2c-{n}").exists() for n in (1, 0)):
-        notes.append("No /dev/i2c-* bus found - enable I2C: run `sudo deploy/install.sh`, then reboot.")
+    bus = cfg.sensor.i2c_bus
+    if cfg.sensor.sht31.enabled and not Path(f"/dev/i2c-{bus}").exists():
+        notes.append(
+            f"/dev/i2c-{bus} is missing - enable I2C (Pi: `sudo deploy/install.sh`; "
+            "Radxa: enable the i2c3 overlay), then reboot."
+        )
     return notes
 
 
@@ -359,8 +377,10 @@ def main(argv: list[str] | None = None) -> None:
 
     sht31 = prompt_sht31(cfg.sensor.sht31)
     if sht31.enabled:
+        bus = _ask_int("  I2C bus number (/dev/i2c-N; Pi = 1, Radxa ZERO 3W = 3)", sensor.i2c_bus, lo=0)
+        sensor = replace(sensor, i2c_bus=bus)
         print()
-        if not _probe_loop("SHT31", lambda: probe_sht31(sht31.address)):
+        if not _probe_loop("SHT31", lambda: probe_sht31(sht31.address, sensor.i2c_bus)):
             if _ask_bool("  Disable the SHT31 for now?", True):
                 sht31 = SHT31Config(enabled=False, address=sht31.address)
 

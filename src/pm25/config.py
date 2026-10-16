@@ -25,8 +25,10 @@ class SensorConfig:
     reset_after_failures: int = 3
     reopen_after_failures: int = 6
     use_atmospheric: bool = True
-    pin_enable: int | None = 22
-    pin_reset: int | None = 27
+    # int = BCM pin (gpiozero, Raspberry Pi); "gpiochipN:line" = libgpiod line (Radxa etc.)
+    pin_enable: int | str | None = 22
+    pin_reset: int | str | None = 27
+    i2c_bus: int = 1  # SHT31 I2C bus: 1 on the Raspberry Pi, 3 on the Radxa ZERO 3W
     sht31: SHT31Config = field(default_factory=SHT31Config)
 
 
@@ -92,6 +94,18 @@ class DashboardConfig:
 
 
 @dataclass(frozen=True)
+class UpdateConfig:
+    """Over-the-air updates, delivered over Tailscale (see deploy/ota-push.sh)."""
+
+    allow_web_trigger: bool = True  # dashboard/API may request an update (tailnet + token only)
+    token_env: str = "PM25_UPDATE_TOKEN"  # env var holding the bearer token for POST /api/update
+    state_dir: str = "/var/lib/pm25/ota"  # request + status files shared with pm25-update.service
+    remote: str = ""  # git remote for "pull" updates; empty = origin (must be reachable over the tailnet)
+    branch: str = "main"
+    auto_pull: bool = False  # pm25-autoupdate.timer pulls nightly when true
+
+
+@dataclass(frozen=True)
 class Config:
     sensor: SensorConfig
     storage: StorageConfig
@@ -99,6 +113,7 @@ class Config:
     sync: SyncConfig
     alerts: AlertConfig = field(default_factory=AlertConfig)
     dashboard: DashboardConfig = field(default_factory=DashboardConfig)
+    update: UpdateConfig = field(default_factory=UpdateConfig)
 
 
 _SENSOR_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
@@ -116,6 +131,8 @@ def _validate_config(cfg: Config) -> None:
         raise ValueError("sensor.period_s must exceed warmup_s + sample_s in duty_cycle mode")
     if sensor.reset_after_failures < 0 or sensor.reopen_after_failures < 0:
         raise ValueError("sensor recovery thresholds cannot be negative")
+    if sensor.i2c_bus < 0:
+        raise ValueError("sensor.i2c_bus cannot be negative")
     if cfg.storage.raw_retention_days < 1:
         raise ValueError("storage.raw_retention_days must be at least 1")
     if cfg.storage.commit_interval_s < 0:
@@ -151,13 +168,51 @@ def _validate_config(cfg: Config) -> None:
     if dash.live_interval_s < 1:
         raise ValueError("dashboard.live_interval_s must be at least 1")
 
+    upd = cfg.update
+    if not _GIT_NAME_RE.fullmatch(upd.branch):
+        raise ValueError("update.branch must be a plain branch name")
+    if upd.remote and not _GIT_REMOTE_RE.fullmatch(upd.remote):
+        raise ValueError("update.remote must be a remote name or an ssh/https/git URL without spaces")
+    if not upd.state_dir.startswith("/"):
+        raise ValueError("update.state_dir must be an absolute path")
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", upd.token_env):
+        raise ValueError("update.token_env must be an environment variable name")
 
-def _pin(value: object) -> int | None:
-    """TOML has no null, so a negative pin number means 'not wired'."""
-    if value is None:
+
+_GIT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
+_GIT_REMOTE_RE = re.compile(r"^[A-Za-z0-9@:/._~+-]{1,255}$")
+
+
+GPIOD_PIN_RE = re.compile(r"^(?:/dev/)?gpiochip\d+:\d+$")
+
+
+def parse_pin(value: object) -> int | str | None:
+    """Parse a control-pin setting.
+
+    TOML has no null, so a negative number (or an empty string) means 'not wired'.
+    An int is a BCM pin driven via gpiozero; a "gpiochipN:line" string is a
+    libgpiod line (used on non-Pi boards such as the Radxa ZERO 3W).
+    """
+    if value is None or isinstance(value, bool):
         return None
-    n = int(value)  # type: ignore[arg-type]
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if GPIOD_PIN_RE.fullmatch(text):
+            return text
+        try:
+            n = int(text)
+        except ValueError:
+            raise ValueError(
+                f"invalid pin {value!r}: use a BCM number, -1, or 'gpiochipN:line'"
+            ) from None
+    else:
+        n = int(value)  # type: ignore[arg-type]
     return None if n < 0 else n
+
+
+_pin = parse_pin
 
 
 def load_config(path: str | Path) -> Config:
@@ -182,6 +237,7 @@ def load_config(path: str | Path) -> Config:
         use_atmospheric=bool(s.get("use_atmospheric", True)),
         pin_enable=_pin(s.get("pin_enable", 22)),
         pin_reset=_pin(s.get("pin_reset", 27)),
+        i2c_bus=int(s.get("i2c_bus", 1)),
         sht31=SHT31Config(
             enabled=bool(h.get("enabled", False)),
             address=int(h.get("address", 0x44)),
@@ -242,6 +298,18 @@ def load_config(path: str | Path) -> Config:
         mask_indoors_aqi=int(dash.get("mask_indoors_aqi", -1)),
     )
 
-    cfg = Config(sensor=sensor, storage=storage, web=web, sync=sync, alerts=alerts, dashboard=dashboard)
+    u = data.get("update", {})
+    update = UpdateConfig(
+        allow_web_trigger=bool(u.get("allow_web_trigger", True)),
+        token_env=str(u.get("token_env", "PM25_UPDATE_TOKEN")),
+        state_dir=str(u.get("state_dir", "/var/lib/pm25/ota")),
+        remote=str(u.get("remote", "")),
+        branch=str(u.get("branch", "main")),
+        auto_pull=bool(u.get("auto_pull", False)),
+    )
+
+    cfg = Config(
+        sensor=sensor, storage=storage, web=web, sync=sync, alerts=alerts, dashboard=dashboard, update=update
+    )
     _validate_config(cfg)
     return cfg

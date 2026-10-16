@@ -6,6 +6,7 @@ Frame: 0x42 0x4D, 2-byte length, then 13 uint16 data words + 1 uint16 checksum
 """
 from __future__ import annotations
 
+import logging
 import struct
 import time
 
@@ -18,6 +19,13 @@ try:
     from gpiozero import OutputDevice
 except Exception:  # pragma: no cover
     OutputDevice = None
+
+try:  # libgpiod bindings (the 'radxa' extra); used for "gpiochipN:line" pins
+    import gpiod
+except Exception:  # pragma: no cover
+    gpiod = None
+
+log = logging.getLogger(__name__)
 
 _SOF = (0x42, 0x4D)
 _SLEEP_CMD = bytes([0x42, 0x4D, 0xE4, 0x00, 0x00, 0x01, 0x73])
@@ -32,27 +40,98 @@ class SensorTransportError(RuntimeError):
     pass
 
 
+class GpiodOutput:
+    """Minimal ``gpiozero.OutputDevice`` stand-in backed by libgpiod (v2 or v1 API)."""
+
+    def __init__(self, spec: str, initial_value: bool = True, consumer: str = "pm25") -> None:
+        chip, _, line = spec.rpartition(":")
+        self._line_no = int(line)
+        self._path = chip if chip.startswith("/dev/") else f"/dev/{chip}"
+        self._request = None
+        self._line = None
+        self._chip = None
+        if hasattr(gpiod, "request_lines"):  # libgpiod v2 bindings
+            from gpiod.line import Direction, Value
+
+            self._active, self._inactive = Value.ACTIVE, Value.INACTIVE
+            self._request = gpiod.request_lines(
+                self._path,
+                consumer=consumer,
+                config={
+                    self._line_no: gpiod.LineSettings(
+                        direction=Direction.OUTPUT,
+                        output_value=self._active if initial_value else self._inactive,
+                    )
+                },
+            )
+        else:  # libgpiod v1 bindings
+            self._active, self._inactive = 1, 0
+            self._chip = gpiod.Chip(self._path)
+            self._line = self._chip.get_line(self._line_no)
+            self._line.request(
+                consumer=consumer, type=gpiod.LINE_REQ_DIR_OUT, default_vals=[1 if initial_value else 0]
+            )
+
+    def _set(self, value) -> None:
+        if self._request is not None:
+            self._request.set_value(self._line_no, value)
+        elif self._line is not None:
+            self._line.set_value(value)
+
+    def on(self) -> None:
+        self._set(self._active)
+
+    def off(self) -> None:
+        self._set(self._inactive)
+
+    def close(self) -> None:
+        try:
+            if self._request is not None:
+                self._request.release()
+            elif self._line is not None:
+                self._line.release()
+            if self._chip is not None:
+                self._chip.close()
+        finally:
+            self._request = self._line = self._chip = None
+
+
+def make_output(pin: int | str | None, initial_value: bool = True):
+    """Return an on()/off()/close() output for ``pin``, or None if unwired or unsupported.
+
+    Integer pins are BCM numbers driven by gpiozero (Raspberry Pi). Strings of the
+    form "gpiochipN:line" are driven by libgpiod (e.g. Radxa ZERO 3W).
+    """
+    if pin is None:
+        return None
+    if isinstance(pin, str):
+        if gpiod is None:
+            log.warning("gpiod not installed - ignoring pin %s (run `uv sync --extra radxa`)", pin)
+            return None
+        return GpiodOutput(pin, initial_value=initial_value)
+    if OutputDevice is None:
+        log.warning("gpiozero not installed - ignoring BCM pin %s", pin)
+        return None
+    return OutputDevice(pin, initial_value=initial_value)
+
+
 class PMS5003:
     def __init__(
         self,
         device: str,
         baud: int = 9600,
-        pin_enable: int | None = None,
-        pin_reset: int | None = None,
+        pin_enable: int | str | None = None,
+        pin_reset: int | str | None = None,
         read_timeout: float = 5.0,
     ) -> None:
         if serial is None:
-            raise RuntimeError("pyserial not installed - run `uv sync --extra pi` on the Pi")
+            raise RuntimeError("pyserial not installed - run `uv sync --extra pi` (or `--extra radxa`)")
         self._device = device
         self._baud = baud
         self._serial = serial.Serial(self._device, baudrate=self._baud, timeout=1.0)
         self.read_timeout = read_timeout
-        self._enable = None
-        self._reset = None
-        if pin_enable is not None and OutputDevice is not None:
-            self._enable = OutputDevice(pin_enable, initial_value=True)
-        if pin_reset is not None and OutputDevice is not None:
-            self._reset = OutputDevice(pin_reset, initial_value=True)
+        self._enable = make_output(pin_enable, initial_value=True)
+        self._reset = make_output(pin_reset, initial_value=True)
 
     def reset(self) -> None:
         if self._reset is not None:

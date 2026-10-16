@@ -1,0 +1,10 @@
+[Unit]
+Description=PM2.5 monitor: nightly OTA pull (enabled when [update] auto_pull = true)
+
+[Timer]
+OnCalendar=*-*-* 03:30
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -279,10 +279,18 @@ while maintaining a decent history."
 - **`deploy/install.sh` (idempotent):** install `uv` → `uv sync` → write `config.toml` from
   example → apply UART edits → install & enable `pm25-reader.service`, `pm25-web.service`,
   `pm25-sync.timer` → `tailscale up` (with a tagged **auth key**).
-- **`deploy/update.sh`:** `git pull` → `uv sync` → `systemctl restart pm25-*`. Tag releases;
-  keep the previous commit/venv for quick rollback. Optional opt-in `pm25-update.timer`.
-- **Remote deploy from a dev box:** `rsync` over **Tailscale SSH** + restart, or a GitHub
-  Action using the Tailscale action to SSH-deploy.
+- **`deploy/update.sh`:** `--pull`, `--apply-staged`, `--request`, and `--reinstall`;
+  fast-forward only, serialized with `flock`, with rollback to the previous commit on a
+  failed health check. `[update]` config controls optional nightly tailnet-remote pulls
+  via `pm25-autoupdate.timer`.
+- **Remote deploy from a dev box:** `deploy/ota-push.sh <device>` pushes over **Tailscale
+  SSH** to `refs/ota/incoming`; optional `--wheels` supplies an offline wheelhouse.
+  `GET/POST /api/update` is tailnet/loopback only with a bearer token from
+  `/etc/pm25/update.env`; root `pm25-update.path` runs `update.sh --request`.
+- **Network controls:** optional nftables egress lockdown permits Tailscale, LAN, DNS,
+  and NTP; `tailscale serve` provides HTTPS (`PM25_TS_HTTPS` / `TS_HTTPS`).
+  `TS_AUTHKEY` enables unattended tailnet join in the installer and DietPi automation.
+  See [docs/OTA.md](docs/OTA.md); on-device validation is still pending.
 - **No Docker on the Pi** (RAM + GPIO/serial passthrough overhead); Docker is fine on the
   server.
 
