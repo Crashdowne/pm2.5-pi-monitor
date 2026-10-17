@@ -1,0 +1,18 @@
+[Unit]
+Description=PM2.5 monitor: egress lockdown (LAN + Tailscale only)
+Documentation=man:nft(8)
+DefaultDependencies=no
+Before=network-pre.target
+Wants=network-pre.target
+After=local-fs.target
+ConditionPathExists=/etc/pm25/firewall.env
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/pm25-firewall apply
+ExecReload=/usr/local/sbin/pm25-firewall apply
+ExecStop=/usr/local/sbin/pm25-firewall open
+
+[Install]
+WantedBy=sysinit.target

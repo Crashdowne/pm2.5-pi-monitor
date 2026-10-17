@@ -44,9 +44,26 @@ Use the **DietPi ARM64 (64-bit) image** (Debian Trixie) for the Pi Zero 2 W. 64-
 Trixie (glibc 2.41) lets every Python dependency install from a prebuilt wheel, so no
 compiler is needed on the Pi.
 
-**Zero-touch (headless, no GUI):** flash the image, then drop three files on the boot
-partition for a fully unattended first-boot install - see
-[deploy/dietpi/README.md](deploy/dietpi/README.md).
+**Zero-touch (headless, no GUI):** flash the image, then drop a few files on the boot
+partition. On first boot the device joins Tailscale, pulls the app from your dev machine
+over the tailnet, installs it, and locks down internet egress. Full guide:
+[docs/SETUP.md](docs/SETUP.md); short version: [deploy/dietpi/README.md](deploy/dietpi/README.md).
+
+The v2 bootstrap fetches a SHA256-checked git bundle served by `deploy/serve-source.sh`
+over `tailscale serve`, or uses a local `pm25.bundle` / `pm25-installer.sh` drop-in.
+The early pre-script installs a persistent retry timer even if DietPi first run fails;
+service-mode installation waits for DietPi's `.install_stage=2` or uptime over one hour.
+Retries start three minutes after boot and repeat every 15 minutes; apt lock timeout is
+600 seconds. The bootstrap scrubs the Tailscale auth key from boot files.
+Card drop-ins survive on Pi, but Radxa deletes its `DIETPISETUP` partition after first
+boot: copy drop-ins into `/boot` on the device instead.
+
+**Bootstrap status (2026-10-16):** uncommitted, on top of earlier uncommitted Radxa and
+OTA work. `bash -n` passed for all four scripts, and the bundle-only generation,
+verification, fetch, and checkout round-trip passed. Python tests were not run again
+(no Python changes; previous run: 106/106 passed). On-device testing is not run;
+the Radxa boot partition layout is inferred. Next: commit, then test on a Radxa ZERO 3W.
+Bundles contain only committed code, so commit the changes before serving them.
 
 **Manual:**
 
@@ -84,13 +101,20 @@ sudo /opt/pm25/.venv/bin/pm25-setup
 | `pm25-sync.timer` | offload to the server over Tailscale, then prune (every 6 h) |
 | `pm25-alert.timer` | evaluate AQI, stale sensor, sync, and disk alerts (every 2 min) |
 | `pm25-wifi-powersave.service` | disable Wi-Fi power save so the dashboard stays reachable |
+| `pm25-update.path` | runs `deploy/update.sh --request` when the dashboard requests an update |
+| `pm25-autoupdate.timer` | optional nightly pull from a tailnet git remote (`[update] auto_pull`) |
+| `pm25-firewall.service` | re-applies the egress lockdown at boot (when `/etc/pm25/firewall.env` exists) |
 
 Services run under systemd memory caps (`MemoryMax`), and the journal is kept in RAM
 (`Storage=volatile`) so the SD card mostly sees database writes, not logs. An optional,
 memory-capped Cloudflare Tunnel unit ([deploy/pm25-cloudflared.service](deploy/pm25-cloudflared.service))
 is available if you must expose the dashboard publicly — keep it behind Cloudflare Access.
 
-Update in place: `sudo deploy/update.sh` (`git pull` + `uv sync` + restart).
+Updates are over-the-air through Tailscale: from your dev machine run
+`deploy/ota-push.sh <device>` (git push over Tailscale SSH, then a fast-forward with automatic
+rollback), or trigger one from the dashboard. Dependencies install offline from wheels shipped
+with `ota-push.sh --wheels`. The device can run with all non-Tailscale internet egress blocked
+and serve the dashboard over HTTPS with `tailscale serve`. See [docs/OTA.md](docs/OTA.md).
 
 ## Choosing a backend
 
@@ -191,6 +215,10 @@ uv run python -W error::ResourceWarning -m unittest discover -s tests -v
   Funnel. The optional Cloudflare Tunnel unit is the one exception; gate it with Cloudflare
   Access, since the dashboard has no built-in authentication.
 - Ingest requires a bearer token and should be bound to `tailscale0` behind an ACL.
+- OTA update requests (`POST /api/update`) are accepted only from the tailnet or loopback
+  (`tailscale serve`) with the bearer token in `/etc/pm25/update.env`; the web service never
+  runs the update itself. The optional egress firewall (`pm25-firewall`) blocks all
+  non-Tailscale internet traffic.
 - The Cloudflare Worker keeps its dashboard public but gates alert-config writes behind an
   `ADMIN_TOKEN` secret (fail-closed when unset); add a Cloudflare rate-limiting rule on
   `/ingest`. The self-hosted warehouse can require HTTP Basic on reads via `PM25_READ_TOKEN`.

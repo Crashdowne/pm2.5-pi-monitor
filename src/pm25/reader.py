@@ -241,7 +241,7 @@ def run(cfg: Config, simulation_profile: str | None = None) -> None:
         try:
             from .sensor_sht31 import SHT31
 
-            sht = SHT31(address=cfg.sensor.sht31.address)
+            sht = SHT31(bus=cfg.sensor.i2c_bus, address=cfg.sensor.sht31.address)
         except Exception as e:  # keep logging PM even if the humidity sensor is missing
             log.warning("SHT31 init failed, continuing without humidity: %s", e)
             conn.execute(

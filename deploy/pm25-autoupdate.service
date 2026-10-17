@@ -1,0 +1,15 @@
+[Unit]
+Description=PM2.5 monitor: pull and apply updates from the tailnet git remote
+Documentation=file://{{REPO}}/docs/OTA.md
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Environment=HOME=/root
+Environment=PM25_UPDATE_SOURCE=timer
+ExecStart={{REPO}}/deploy/update.sh --pull
+TimeoutStartSec=30min
+Nice=10
+IOSchedulingClass=idle

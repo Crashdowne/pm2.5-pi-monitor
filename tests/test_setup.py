@@ -12,6 +12,7 @@ from pm25.config import (
     SHT31Config,
     StorageConfig,
     SyncConfig,
+    UpdateConfig,
     WebConfig,
     load_config,
 )
@@ -55,6 +56,36 @@ class RenderConfigTests(unittest.TestCase):
         self.assertEqual(loaded.sync.sensor_id, "porch")
         self.assertEqual(loaded.sync.batch_size, 150)
 
+    def test_round_trips_gpiochip_pin_and_i2c_bus(self) -> None:
+        cfg = Config(
+            sensor=SensorConfig(device="/dev/ttyS4", pin_enable="gpiochip3:8", pin_reset=None, i2c_bus=3),
+            storage=StorageConfig(),
+            web=WebConfig(),
+            sync=SyncConfig(),
+        )
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "config.toml"
+            path.write_text(setup.render_config(cfg))
+            loaded = load_config(path)
+        self.assertEqual(loaded.sensor.pin_enable, "gpiochip3:8")
+        self.assertIsNone(loaded.sensor.pin_reset)
+        self.assertEqual(loaded.sensor.i2c_bus, 3)
+
+
+    def test_round_trips_update_section(self) -> None:
+        cfg = Config(
+            sensor=SensorConfig(),
+            storage=StorageConfig(),
+            web=WebConfig(),
+            sync=SyncConfig(),
+            update=UpdateConfig(remote="ssh://git@devbox/pm25.git", branch="stable", auto_pull=True, allow_web_trigger=False),
+        )
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "config.toml"
+            path.write_text(setup.render_config(cfg))
+            loaded = load_config(path)
+        self.assertEqual(loaded.update, cfg.update)
+
 
 class PromptTests(unittest.TestCase):
     def test_prompt_sensor_collects_values(self) -> None:
@@ -79,6 +110,13 @@ class PromptTests(unittest.TestCase):
             sht = setup.prompt_sht31(SHT31Config(enabled=True, address=0x44))
         self.assertFalse(sht.enabled)
 
+    def test_ask_pin_accepts_gpiochip_and_rejects_garbage(self) -> None:
+        answers = iter(["chip9", "gpiochip3:8"])
+        with mock.patch("builtins.input", lambda _prompt: next(answers)), _quiet():
+            self.assertEqual(setup._ask_pin("SET", 22), "gpiochip3:8")
+        with mock.patch("builtins.input", lambda _prompt: "none"), _quiet():
+            self.assertIsNone(setup._ask_pin("SET", "gpiochip3:8"))
+
 
 class ProbeTests(unittest.TestCase):
     def test_probe_pms_reports_missing_hardware(self) -> None:
@@ -92,7 +130,7 @@ class ProbeTests(unittest.TestCase):
 class WizardFlowTests(unittest.TestCase):
     def test_main_writes_config_without_restart(self) -> None:
         answers = iter(
-            ["/dev/ttyAMA0", "duty_cycle", "180", "30", "8", "22", "27", "y", "y", "0x44", "y"]
+            ["/dev/ttyAMA0", "duty_cycle", "180", "30", "8", "22", "27", "y", "y", "0x44", "3", "y"]
         )
         with tempfile.TemporaryDirectory() as d:
             path = str(Path(d) / "config.toml")
@@ -107,6 +145,7 @@ class WizardFlowTests(unittest.TestCase):
             self.assertEqual(loaded.sensor.pin_enable, 22)
             self.assertEqual(loaded.sensor.pin_reset, 27)
             self.assertTrue(loaded.sensor.sht31.enabled)
+            self.assertEqual(loaded.sensor.i2c_bus, 3)
 
 
 if __name__ == "__main__":

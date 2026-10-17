@@ -12,8 +12,10 @@ sample_interval_s = 60      # continuous mode only (mode = "continuous"); ignore
 reset_after_failures = 3    # hardware reset after this many empty sampling cycles
 reopen_after_failures = 6   # reopen UART after this many empty sampling cycles
 use_atmospheric = true      # use the atmospheric/environmental PM values (recommended outdoors)
-pin_enable = 22             # BCM pin -> PMS5003 SET (sleep/wake). Set to -1 to disable
-pin_reset = 27              # BCM pin -> PMS5003 RESET. Set to -1 to disable
+pin_enable = 22             # PMS5003 SET (sleep/wake): BCM pin on a Pi, or "gpiochipN:line" for libgpiod
+                            # boards (e.g. "gpiochip3:8" on a Radxa ZERO 3W). Set to -1 if not wired.
+pin_reset = 27              # PMS5003 RESET: same syntax as pin_enable. Set to -1 if not wired.
+i2c_bus = 1                 # SHT31 I2C bus (/dev/i2c-N). Raspberry Pi: 1, Radxa ZERO 3W: 3
 
 [sensor.sht31]
 enabled = true              # set to false if the humidity sensor is not wired
@@ -73,3 +75,13 @@ stale_after_s = 600
 sync_lag_s = 28800
 disk_free_mb = 150
 request_timeout_s = 10
+
+# Over-the-air updates over Tailscale (see docs/OTA.md). Code arrives either pushed from a dev machine
+# with deploy/ota-push.sh (staged, then applied) or pulled from `remote`, a git URL reachable on the tailnet.
+[update]
+allow_web_trigger = true           # dashboard "Update" button; tailnet/`tailscale serve` clients + token only
+token_env = "PM25_UPDATE_TOKEN"    # token is generated into /etc/pm25/update.env by install.sh
+state_dir = "/var/lib/pm25/ota"    # request/status files shared with pm25-update.service
+remote = ""                        # empty = origin; or a remote name/URL to pull from (e.g. ssh://git@devbox.tailnet.ts.net/pm25.git)
+branch = "main"
+auto_pull = false                  # true = nightly pull + apply via pm25-autoupdate.timer

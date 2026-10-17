@@ -1,11 +1,13 @@
 import tempfile
+import os
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from pm25 import db
 from pm25.api import create_app
-from pm25.config import Config, SensorConfig, SHT31Config, StorageConfig, SyncConfig, WebConfig
+from pm25.config import Config, SensorConfig, SHT31Config, StorageConfig, SyncConfig, UpdateConfig, WebConfig
 
 
 class ApiTests(unittest.TestCase):
@@ -91,6 +93,62 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["health"]["sample_period_s"], 180)
 
+
+class UpdateApiTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.state = Path(self.tempdir.name) / "ota"
+        self.state.mkdir()
+        self.cfg = Config(
+            sensor=SensorConfig(),
+            storage=StorageConfig(db_path=str(Path(self.tempdir.name) / "pm25.db")),
+            web=WebConfig(),
+            sync=SyncConfig(),
+            update=UpdateConfig(state_dir=str(self.state), token_env="PM25_TEST_UPDATE_TOKEN"),
+        )
+        env = mock.patch.dict(os.environ, {"PM25_TEST_UPDATE_TOKEN": "tok"})
+        env.start()
+        self.addCleanup(env.stop)
+        self.client = create_app(self.cfg).test_client()
+
+    def tearDown(self) -> None:
+        self.tempdir.cleanup()
+
+    def _post(self, addr: str = "127.0.0.1", token: str | None = "tok", **body):
+        headers = {"Authorization": f"Bearer {token}"} if token is not None else {}
+        return self.client.post("/api/update", json=body, headers=headers, environ_base={"REMOTE_ADDR": addr})
+
+    def test_status_reports_actions(self) -> None:
+        data = self.client.get("/api/update").get_json()
+        self.assertEqual(data["actions"], ["pull", "apply_staged"])
+        self.assertTrue(data["allow_web_trigger"])
+        self.assertIsNone(data["pending_request"])
+
+    def test_trusted_request_is_accepted_then_conflicts(self) -> None:
+        resp = self._post(addr="100.100.5.6", action="apply_staged")
+        self.assertEqual(resp.status_code, 202)
+        self.assertEqual(resp.get_json()["requested"]["action"], "apply_staged")
+        self.assertTrue((self.state / "request").exists())
+        self.assertEqual(self._post().status_code, 409)
+
+    def test_lan_peer_is_refused(self) -> None:
+        self.assertEqual(self._post(addr="192.168.1.50").status_code, 403)
+        self.assertFalse((self.state / "request").exists())
+
+    def test_bad_or_missing_token_is_refused(self) -> None:
+        self.assertEqual(self._post(token="nope").status_code, 401)
+        self.assertEqual(self._post(token=None).status_code, 401)
+
+    def test_bad_action_is_rejected(self) -> None:
+        self.assertEqual(self._post(action="shell").status_code, 400)
+
+    def test_disabled_trigger_is_refused(self) -> None:
+        cfg = Config(
+            sensor=SensorConfig(), storage=self.cfg.storage, web=WebConfig(), sync=SyncConfig(),
+            update=UpdateConfig(state_dir=str(self.state), allow_web_trigger=False),
+        )
+        resp = create_app(cfg).test_client().post("/api/update", json={}, headers={"Authorization": "Bearer tok"})
+        self.assertEqual(resp.status_code, 403)
 
 if __name__ == "__main__":
     unittest.main()

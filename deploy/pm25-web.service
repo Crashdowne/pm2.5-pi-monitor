@@ -9,6 +9,8 @@ User=pm25-web
 Group=pm25-data
 UMask=0007
 WorkingDirectory={{REPO}}
+# Dashboard OTA token (root-only file; systemd reads it before dropping privileges).
+EnvironmentFile=-/etc/pm25/update.env
 ExecStart={{PYTHON}} -m pm25.web --config /etc/pm25/config.toml
 Restart=always
 RestartSec=5
