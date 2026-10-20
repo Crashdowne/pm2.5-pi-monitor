@@ -1,6 +1,6 @@
 # Copilot instructions
 
-<!-- agent-bootstrap:start v3 -->
+<!-- agent-bootstrap:start v4 -->
 ## Agent defaults (managed by ~/.copilot/hooks/repo-bootstrap.mjs)
 
 Repo-specific rules go outside this block; edits inside are overwritten. Opt out: set `{"bootstrap": false}` in `.github/docs-sync.json`, then delete this block.
@@ -35,8 +35,10 @@ Repo-specific rules go outside this block; edits inside are overwritten. Opt out
 - Do not edit status docs yourself; `docs-sync` owns them. Skip it for formatting-only or exploratory work.
 - Status doc: `AGENTS.md` if present, otherwise `README.md` only when user-facing behavior, setup, or configuration changed.
 
-### No GitHub Actions
+### CI and builds: Gitea Actions
 
-- Never use GitHub Actions; they cost money. Do not add `.github/workflows/`, composite actions, or Actions-based CI, release, or deploy steps.
-- Run tests, builds, releases, and deploys locally with repo scripts or CLIs. Remove Actions files you find instead of fixing them.
+- GitHub stays the source of truth. CI, builds, releases, and deploys run on self-hosted Gitea Actions at https://git.ariverse.ca, which syncs this repo's mirror within about 30 seconds of a push.
+- Put workflows in `.gitea/workflows/`, never `.github/workflows/`; GitHub Actions costs money. Move any GitHub workflow files you find to `.gitea/workflows/`.
+- Use one `runs-on` label: `ubuntu-latest` (Linux container, no `docker` commands) or `macos-arm64` (the Mac Studio with Xcode; runs only while Ari is logged in). Trigger on `push` or `workflow_dispatch`; `pull_request` never fires on the mirror.
+- After pushing, run `gitea-ci wait` for the results; `gitea-ci logs <task>` prints a job log, and `gitea-ci run <workflow>.yml` starts a build. Local test and build runs during development are still fine.
 <!-- agent-bootstrap:end -->

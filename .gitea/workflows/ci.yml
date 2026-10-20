@@ -1,0 +1,53 @@
+# Self-hosted CI on https://git.ariverse.ca (Gitea Actions). Gitea pull-mirrors this
+# repository from GitHub and runs this workflow on every branch push; GitHub ignores
+# .gitea/, so it uses no GitHub Actions minutes. Check results with `gitea-ci wait`.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+jobs:
+  python:
+    name: Monitor (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # Core dependencies only: the pi/radxa extras are serial/GPIO/I2C hardware drivers,
+      # and the tests use fake sensors instead.
+      - name: Install dependencies
+        run: python3 -m venv .venv && .venv/bin/pip install -e .
+      - name: Test
+        run: .venv/bin/python -W error::ResourceWarning -m unittest discover -s tests -v
+
+  worker:
+    name: Worker (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: aqi-worker
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+
+  web:
+    name: Web (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: aqi-worker/web
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
