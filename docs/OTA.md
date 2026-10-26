@@ -88,7 +88,8 @@ installed. Your dev machine needs `git`, `ssh`, and `uv`. Options: `--user` (def
 
 ## 4. Updating: pull from a tailnet git remote (optional)
 
-If a git server is reachable on the tailnet (Gitea, a bare repo on a NAS, and so on),
+If a git server is reachable on the tailnet (the GitLab host, if reachable, a bare
+repo on a NAS, and so on),
 point the device at it in `/etc/pm25/config.toml`:
 
 ```toml

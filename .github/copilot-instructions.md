@@ -1,6 +1,7 @@
 # Copilot instructions
 
-<!-- agent-bootstrap:start v4 -->
+<!-- agent-bootstrap:start v7 -->
+
 ## Agent defaults (managed by ~/.copilot/hooks/repo-bootstrap.mjs)
 
 Repo-specific rules go outside this block; edits inside are overwritten. Opt out: set `{"bootstrap": false}` in `.github/docs-sync.json`, then delete this block.
@@ -35,10 +36,22 @@ Repo-specific rules go outside this block; edits inside are overwritten. Opt out
 - Do not edit status docs yourself; `docs-sync` owns them. Skip it for formatting-only or exploratory work.
 - Status doc: `AGENTS.md` if present, otherwise `README.md` only when user-facing behavior, setup, or configuration changed.
 
-### CI and builds: Gitea Actions
+### Automatic commits and CI
 
-- GitHub stays the source of truth. CI, builds, releases, and deploys run on self-hosted Gitea Actions at https://git.ariverse.ca, which syncs this repo's mirror within about 30 seconds of a push.
-- Put workflows in `.gitea/workflows/`, never `.github/workflows/`; GitHub Actions costs money. Move any GitHub workflow files you find to `.gitea/workflows/`.
-- Use one `runs-on` label: `ubuntu-latest` (Linux container, no `docker` commands) or `macos-arm64` (the Mac Studio with Xcode; runs only while Ari is logged in). Trigger on `push` or `workflow_dispatch`; `pull_request` never fires on the mirror.
-- After pushing, run `gitea-ci wait` for the results; `gitea-ci logs <task>` prints a job log, and `gitea-ci run <workflow>.yml` starts a build. Local test and build runs during development are still fine.
+- For completed, verified work in the user's repositories, automatically commit task-owned changes, push the current branch to its GitLab `origin`, and verify GitLab CI before reporting completion. This standing authorization applies to existing and new repositories; no separate commit or push request is needed.
+- Before committing, review the diff, run the repository's relevant tests, lint and build checks, run `git diff --check`, and finish docs sync. Stage only task-owned changes; never sweep in unrelated edits, pre-existing staged changes, secrets, or another session's work.
+- Ensure a real root `.gitlab-ci.yml` covers the project checks on branch and tag pushes. Review generated starters before committing them. For a new repository, establish its GitLab `origin` and pipeline before claiming remote CI works.
+- After each push, capture `git rev-parse HEAD`, run `gitlab-ci wait`, and verify results belong to that exact commit. A missing, skipped, cancelled, timed-out, or failed required check is not a pass. Inspect failures with `gitlab-ci logs <job-id>`, fix task-caused failures, rerun local checks, commit and push the fix, and wait again.
+- Do not auto-commit or push unfinished work, failing checks, read-only requests, or when the user says not to commit/push. Respect repository opt-outs and explicit approval gates. Never force push, bypass hooks, amend without permission, or create empty commits. If scope, credentials, remote, mirror, or CI tooling blocks completion, preserve the work and report the exact blocker; do not claim CI passed.
+
+### Git hosting and CI: self-hosted GitLab
+
+- GitLab CE 19.5.1 at https://gitlab.ariverse.ca is the primary host; repos are `ari/<name>`. Use HTTPS `origin` = `https://gitlab.ariverse.ca/ari/<name>.git`; credentials use the `osxkeychain` git helper and `glab` is logged in. A `github` remote may remain for reference. GitLab push-mirrors to GitHub `Crashdowne/<name>`; never push to GitHub directly.
+- Create repos on GitLab (`git push` to that URL creates a private project, or `glab repo create`). If GitHub is needed, create its repo and add a GitLab push mirror.
+- CI, builds, releases, and deploys use root `.gitlab-ci.yml`. Never add `.github/workflows/` or `.gitea/workflows/`; convert existing files to `.gitlab-ci.yml` and delete the old ones. Gitea (`git.ariverse.ca`) and `gitea-ci` are retired.
+- Every job sets `tags:` with exactly one tag. `ubuntu-latest`: Docker executor on the GitLab server (`servy-docker`, Linux amd64). Set `default: image: catthehacker/ubuntu:act-latest` (node, python3, git, jq) or a job `image:`; the runner default is bare `alpine`. No `docker` commands, and jobs cannot reach `https://gitlab.ariverse.ca` (API, registry, releases); instance CI variables rewrite git clones to `http://gitlab`. `macos-arm64`: Mac Studio shell executor for Xcode, signing, docker CLI, registry pushes, releases, and deploys to the Mac; only while Ari is logged in. Untagged jobs land on the server runner.
+- Run pipelines on every branch/tag push; use `workflow: rules:` to skip `merge_request_event` duplicates. Allow manual runs with `rules: - if: $CI_PIPELINE_SOURCE =~ /^(web|api)$/`.
+- Store secrets as masked GitLab CI/CD variables via `glab variable set`; protect variables used only on protected branches/tags. Registry: `$CI_REGISTRY_IMAGE`, `$CI_REGISTRY_USER`/`$CI_REGISTRY_PASSWORD`. Releases: GitLab Releases API with `JOB-TOKEN: $CI_JOB_TOKEN`.
+- After pushing, run `gitlab-ci wait` (HEAD's pipeline; exit 0 means all passed). Use `gitlab-ci status [REF]`, `gitlab-ci logs <job-id>`, `gitlab-ci run --ref <branch> [--var K=V]`, `glab ci view`, or `glab ci lint`. Results: `https://gitlab.ariverse.ca/ari/<name>/-/pipelines`; GitHub never shows them. Local checks remain fine.
+
 <!-- agent-bootstrap:end -->
