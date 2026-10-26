@@ -1,0 +1,43 @@
+# CI runs on GitLab CI/CD at https://gitlab.ariverse.ca (ari/pm2.5-pi-monitor) for every branch push,
+# using the ubuntu-latest Docker runner. Check results with `gitlab-ci wait`.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - when: always
+
+stages:
+  - test
+
+python:
+  stage: test
+  tags: [ubuntu-latest]
+  timeout: 30m
+  interruptible: true
+  script:
+    # Core dependencies only: the pi/radxa extras are serial/GPIO/I2C hardware drivers,
+    # and the tests use fake sensors instead.
+    - python3 -m venv .venv && .venv/bin/pip install -e .
+    - .venv/bin/python -W error::ResourceWarning -m unittest discover -s tests -v
+
+worker:
+  stage: test
+  tags: [ubuntu-latest]
+  timeout: 30m
+  interruptible: true
+  script:
+    - cd aqi-worker
+    - npm ci
+    - npm run typecheck
+    - npm test
+
+web:
+  stage: test
+  tags: [ubuntu-latest]
+  timeout: 30m
+  interruptible: true
+  script:
+    - cd aqi-worker/web
+    - npm ci
+    - npm run build

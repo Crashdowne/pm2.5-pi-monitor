@@ -209,6 +209,10 @@ Run all regression tests with:
 uv run python -W error::ResourceWarning -m unittest discover -s tests -v
 ```
 
+CI runs these tests, plus the `aqi-worker` typecheck/tests and web build, on every push via
+GitLab CI/CD (`.gitlab-ci.yml`, https://gitlab.ariverse.ca/ari/pm2.5-pi-monitor/-/pipelines).
+After pushing, check the result with `gitlab-ci wait`.
+
 ## Security notes
 
 - Dashboard + ingest are **LAN/tailnet only** by default - no public exposure, no Tailscale
